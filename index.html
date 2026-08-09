@@ -56,12 +56,60 @@
     .grid{grid-template-columns:1fr}
     .palette{grid-template-columns:repeat(2,1fr)}
   }
+
+  .topbar{
+    display:flex; justify-content:space-between; gap:12px; align-items:flex-start;
+  }
+  .donate-desktop{
+    width:220px; flex:0 0 220px;
+  }
+  .donate-card{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    padding:10px;
+  }
+  .donate-title{font-size:14px;font-weight:800;margin-bottom:4px}
+  .donate-copy{font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:8px}
+  .donate-frame{
+    width:100%; height:300px; border:none; border-radius:10px; background:#f9f9f9;
+  }
+  .donate-mobile{
+    display:none; margin-top:10px;
+  }
+  .donate-mobile button{
+    background:var(--panel2); color:var(--text); border:1px solid var(--border);
+  }
+  .donate-mobile-panel{
+    display:none; margin-top:10px;
+  }
+  .donate-mobile-panel.open{display:block}
+  .donate-mobile-panel .donate-frame{height:520px}
+  @media(max-width:760px){
+    .topbar{display:block}
+    .donate-desktop{display:none}
+    .donate-mobile{display:block}
+  }
+
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Forge Master Chat Formatter</h1>
-  <div class="sub">Generates the 5-digit color syntax you confirmed works: <code>&lt;#12345/&gt;text</code></div>
+  <div class="topbar">
+    <div style="flex:1;min-width:0">
+      <h1>Forge Master Chat Formatter</h1>
+      <div class="sub">Generates the 5-digit color syntax you confirmed works: <code>&lt;#12345/&gt;text</code></div>
+    </div>
+
+    <div class="donate-desktop">
+      <div class="donate-card">
+        <div class="donate-title">Optional tip</div>
+        <div class="donate-copy">The formatter is free. If it saved you time, you can optionally support it here.</div>
+        <iframe id="kofiframe-desktop"
+          src="https://ko-fi.com/bengarii/?hidefeed=true&widget=true&embed=true&preview=true"
+          class="donate-frame"
+          title="Support bengarii on Ko-fi"></iframe>
+      </div>
+    </div>
+  </div>
 
   <div class="card">
     <label for="text">Text</label>
@@ -125,6 +173,19 @@
       <button class="secondary" id="selectBtn">Select code</button>
     </div>
     <div id="status" class="tiny" style="margin-top:8px"></div>
+
+    <div class="donate-mobile">
+      <button id="donateToggle" class="secondary">Hide donation option</button>
+      <div class="tiny" style="margin-top:6px">
+        Your formatted text is free and already available above. Tipping is completely optional.
+      </div>
+      <div id="donatePanel" class="donate-mobile-panel open">
+        <iframe id="kofiframe-mobile"
+          src="https://ko-fi.com/bengarii/?hidefeed=true&widget=true&embed=true&preview=true"
+          class="donate-frame"
+          title="Support bengarii on Ko-fi"></iframe>
+      </div>
+    </div>
   </div>
 
   <div class="card note">
@@ -274,6 +335,16 @@ $("selectBtn").onclick=()=>{
   out.setSelectionRange(0, out.value.length);
   $("status").textContent="Selected. Use your phone's Copy action.";
 };
+
+
+const donateToggle = $("donateToggle");
+if(donateToggle){
+  donateToggle.onclick=()=>{
+    const panel=$("donatePanel");
+    const open=panel.classList.toggle("open");
+    donateToggle.textContent = open ? "Hide donation option" : "Optional: tip €5";
+  };
+}
 
 updateModeUI();
 render();
