@@ -101,8 +101,8 @@
     </div>
     <div style="height:8px"></div>
     <div class="row">
-      <input type="checkbox" id="newlineSpaces" checked>
-      <label for="newlineSpaces">Also add <code>\n</code> after spaces</label>
+      <input type="checkbox" id="newlineSpaces">
+      <label for="newlineSpaces">Add <code>\n</code> after spaces (one word per line)</label>
     </div>
     <div style="height:8px"></div>
     <div class="row">
@@ -217,9 +217,10 @@ function render(){
     let code = codes[i] || "FFFFF";
     if(safeZeros) code = code.replaceAll("0","1");
     out += `<#${code}/>${ch}`;
-    if(newlineEach && (ch!==" " || newlineSpaces)) out += "\\n";
+    const addBreak = (newlineEach && ch !== " ") || (newlineSpaces && ch === " ");
+    if(addBreak) out += "\\n";
     preview += `<span style="color:${approxCss(code)}">${ch===" "?"&nbsp;":escapeHtml(ch)}</span>`;
-    if(newlineEach && (ch!==" " || newlineSpaces)) preview += "<br>";
+    if(addBreak) preview += "<br>";
   });
 
   $("output").value = out;
