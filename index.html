@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Forge Master Chat Formatter</title>
+<style>
+  :root{
+    --bg:#111318; --panel:#1b1f28; --panel2:#232936; --text:#f5f7fb;
+    --muted:#a9b1c3; --accent:#26a7ff; --border:#333b4b; --danger:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:16px}
+  h1{font-size:22px;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:16px}
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    padding:14px; margin-bottom:12px;
+  }
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 7px}
+  textarea,input,select,button{
+    width:100%; border-radius:10px; border:1px solid var(--border);
+    background:var(--panel2); color:var(--text); font:inherit;
+  }
+  textarea,input,select{padding:11px 12px}
+  textarea{min-height:92px;resize:vertical}
+  button{
+    padding:12px; background:var(--accent); border:none; color:#001522;
+    font-weight:800; cursor:pointer;
+  }
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .row{display:flex;gap:10px;align-items:center}
+  .row input[type=checkbox]{width:auto;transform:scale(1.2)}
+  .row label{margin:0;color:var(--text)}
+  .palette{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .swatch{
+    min-height:44px;border-radius:9px;border:2px solid transparent;padding:6px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:800;cursor:pointer;color:#fff;text-shadow:0 1px 2px #000;
+  }
+  .swatch.selected{border-color:#fff}
+  .preview{
+    background:#4a5368;border-radius:10px;padding:12px;min-height:48px;
+    font-size:20px;font-weight:800;word-break:break-word;
+  }
+  .code{min-height:140px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px}
+  .note{font-size:12px;color:var(--muted);line-height:1.45}
+  .warn{color:#ffd37a}
+  .tiny{font-size:12px;color:var(--muted)}
+  @media(max-width:520px){
+    .grid{grid-template-columns:1fr}
+    .palette{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Forge Master Chat Formatter</h1>
+  <div class="sub">Generates the 5-digit color syntax you confirmed works: <code>&lt;#12345/&gt;text</code></div>
+
+  <div class="card">
+    <label for="text">Text</label>
+    <textarea id="text" placeholder="Type something...">Bengarii</textarea>
+  </div>
+
+  <div class="card">
+    <label>Mode</label>
+    <select id="mode">
+      <option value="solid">Solid color</option>
+      <option value="rainbow" selected>Rainbow</option>
+      <option value="redblack">Red → black</option>
+      <option value="pinkwhite">Pink → white</option>
+      <option value="custom">Custom start → end (5-digit codes)</option>
+    </select>
+
+    <div id="solidBox" style="display:none;margin-top:12px">
+      <label>Solid color</label>
+      <div class="palette" id="palette"></div>
+    </div>
+
+    <div id="customBox" class="grid" style="display:none;margin-top:12px">
+      <div>
+        <label>Start code</label>
+        <input id="startCode" maxlength="5" value="F0000">
+      </div>
+      <div>
+        <label>End code</label>
+        <input id="endCode" maxlength="5" value="0000F">
+      </div>
+    </div>
+
+    <div style="height:12px"></div>
+    <div class="row">
+      <input type="checkbox" id="newlineEach">
+      <label for="newlineEach">Add literal <code>\n</code> after every character</label>
+    </div>
+    <div style="height:8px"></div>
+    <div class="row">
+      <input type="checkbox" id="newlineSpaces" checked>
+      <label for="newlineSpaces">Also add <code>\n</code> after spaces</label>
+    </div>
+    <div style="height:8px"></div>
+    <div class="row">
+      <input type="checkbox" id="safeZeros">
+      <label for="safeZeros">Experimental moderation-safe mode: replace 0 with 1</label>
+    </div>
+    <div class="tiny" style="margin-top:6px">Only use the last option if a message is blocked; it changes the color.</div>
+  </div>
+
+  <div class="card">
+    <label>Preview (approximate only)</label>
+    <div class="preview" id="preview"></div>
+  </div>
+
+  <div class="card">
+    <label for="output">Copy/paste code</label>
+    <textarea id="output" class="code" readonly></textarea>
+    <div class="grid" style="margin-top:10px">
+      <button id="copyBtn">Copy code</button>
+      <button class="secondary" id="selectBtn">Select code</button>
+    </div>
+    <div id="status" class="tiny" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card note">
+    <b>Known working color families from your tests</b><br>
+    Red: <code>F0000</code> · Orange: <code>F0800</code> · Yellow: <code>F0F00</code> ·
+    Green: <code>00F00</code> · Cyan: <code>00F0F</code> · Blue: <code>0000F</code> ·
+    Pink/Purple: <code>F111F</code> · White: <code>FFFFF</code> · Near-black: <code>11111</code>.<br><br>
+    <span class="warn">Forge Master moderation can block some strings, especially some patterns containing many zeros. The formatter cannot guarantee the game accepts every generated combination.</span>
+  </div>
+</div>
+
+<script>
+const PALETTE = [
+  ["Red","F0000","#ff1111"],
+  ["Orange","F0800","#ff7a00"],
+  ["Yellow","F0F00","#ffe600"],
+  ["Green","00F00","#16d83d"],
+  ["Cyan","00F0F","#00d7d7"],
+  ["Blue","0000F","#245bff"],
+  ["Pink","F111F","#ff4fa3"],
+  ["White","FFFFF","#ffffff"],
+  ["Near black","11111","#171717"],
+];
+
+const RAINBOW = ["F0000","F0800","F0F00","08F00","00F00","00F0F","0000F","F111F"];
+const REDBLACK = ["F1111","D1111","B1111","91111","71111","51111","31111","11111"];
+const PINKWHITE = ["F111F","F333F","F555F","F777F","F999F","FBBBF","FDDDF","FFFFF"];
+
+let selectedSolid = "F0000";
+const $ = id => document.getElementById(id);
+
+function hexDigit(c){ return parseInt(c,16); }
+function digitHex(n){ return Math.max(0,Math.min(15,Math.round(n))).toString(16).toUpperCase(); }
+
+function interpolateCode(a,b,t){
+  if(!/^[0-9A-Fa-f]{5}$/.test(a) || !/^[0-9A-Fa-f]{5}$/.test(b)) return "FFFFF";
+  let out="";
+  for(let i=0;i<5;i++){
+    out += digitHex(hexDigit(a[i]) + (hexDigit(b[i])-hexDigit(a[i]))*t);
+  }
+  return out;
+}
+
+function interpolateStops(stops, count){
+  if(count <= 1) return [stops[0]];
+  if(stops.length === count) return stops.slice();
+  let result=[];
+  for(let i=0;i<count;i++){
+    const p = i/(count-1) * (stops.length-1);
+    const lo = Math.floor(p), hi = Math.min(stops.length-1, Math.ceil(p));
+    const t = p-lo;
+    result.push(interpolateCode(stops[lo],stops[hi],t));
+  }
+  return result;
+}
+
+function approxCss(code){
+  // Approximation for preview only. The in-game parser is non-standard.
+  const known = Object.fromEntries(PALETTE.map(x=>[x[1],x[2]]));
+  if(known[code]) return known[code];
+  // crude 5-digit visualization:
+  let r = hexDigit(code[0]||"0")*17;
+  let g = Math.max(hexDigit(code[1]||"0"),hexDigit(code[2]||"0"))*17;
+  let b = Math.max(hexDigit(code[3]||"0"),hexDigit(code[4]||"0"))*17;
+  return `rgb(${r},${g},${b})`;
+}
+
+function getCodesForChars(chars){
+  const mode = $("mode").value;
+  if(mode==="solid") return chars.map(()=>selectedSolid);
+  if(mode==="rainbow") return interpolateStops(RAINBOW, chars.length);
+  if(mode==="redblack") return interpolateStops(REDBLACK, chars.length);
+  if(mode==="pinkwhite") return interpolateStops(PINKWHITE, chars.length);
+  return interpolateStops(
+    [$("startCode").value.toUpperCase(), $("endCode").value.toUpperCase()],
+    chars.length
+  );
+}
+
+function render(){
+  const text = $("text").value;
+  const chars = [...text];
+  const codes = getCodesForChars(chars);
+  const newlineEach = $("newlineEach").checked;
+  const newlineSpaces = $("newlineSpaces").checked;
+  const safeZeros = $("safeZeros").checked;
+
+  let out="", preview="";
+  chars.forEach((ch,i)=>{
+    let code = codes[i] || "FFFFF";
+    if(safeZeros) code = code.replaceAll("0","1");
+    out += `<#${code}/>${ch}`;
+    if(newlineEach && (ch!==" " || newlineSpaces)) out += "\\n";
+    preview += `<span style="color:${approxCss(code)}">${ch===" "?"&nbsp;":escapeHtml(ch)}</span>`;
+    if(newlineEach && (ch!==" " || newlineSpaces)) preview += "<br>";
+  });
+
+  $("output").value = out;
+  $("preview").innerHTML = preview || "&nbsp;";
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+
+function updateModeUI(){
+  $("solidBox").style.display = $("mode").value==="solid" ? "block":"none";
+  $("customBox").style.display = $("mode").value==="custom" ? "grid":"none";
+  render();
+}
+
+PALETTE.forEach(([name,code,css])=>{
+  const d=document.createElement("div");
+  d.className="swatch"+(code===selectedSolid?" selected":"");
+  d.style.background=css;
+  d.style.color = code==="FFFFF" ? "#111":"#fff";
+  d.textContent=`${name} ${code}`;
+  d.onclick=()=>{
+    selectedSolid=code;
+    document.querySelectorAll(".swatch").forEach(x=>x.classList.remove("selected"));
+    d.classList.add("selected");
+    render();
+  };
+  $("palette").appendChild(d);
+});
+
+["text","mode","startCode","endCode","newlineEach","newlineSpaces","safeZeros"].forEach(id=>{
+  $(id).addEventListener("input", id==="mode" ? updateModeUI : render);
+  $(id).addEventListener("change", id==="mode" ? updateModeUI : render);
+});
+
+$("copyBtn").onclick=async()=>{
+  const out=$("output");
+  try{
+    await navigator.clipboard.writeText(out.value);
+    $("status").textContent="Copied.";
+  }catch(e){
+    out.focus(); out.select();
+    try{document.execCommand("copy"); $("status").textContent="Copied.";}
+    catch(_){$("status").textContent="Clipboard blocked by browser. Use Select code, then Copy.";}
+  }
+};
+
+$("selectBtn").onclick=()=>{
+  const out=$("output"); out.focus(); out.select();
+  out.setSelectionRange(0, out.value.length);
+  $("status").textContent="Selected. Use your phone's Copy action.";
+};
+
+updateModeUI();
+render();
+</script>
+</body>
+</html>
