@@ -14,7 +14,12 @@
     margin:0; background:var(--bg); color:var(--text);
     font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
   }
-  .wrap{max-width:760px;margin:0 auto;padding:16px}
+  .page-layout{
+    max-width:1148px; margin:0 auto; padding:16px;
+    display:grid; grid-template-columns:minmax(0,760px) 340px;
+    gap:20px; align-items:start; justify-content:center;
+  }
+  .wrap{min-width:0}
   h1{font-size:22px;margin:0 0 6px}
   .sub{color:var(--muted);font-size:14px;margin-bottom:16px}
   .card{
@@ -57,11 +62,9 @@
     .palette{grid-template-columns:repeat(2,1fr)}
   }
 
-  .topbar{
-    display:flex; justify-content:space-between; gap:12px; align-items:flex-start;
-  }
+  .topbar{display:block}
   .donate-desktop{
-    width:220px; flex:0 0 220px;
+    min-width:0; position:sticky; top:16px;
   }
   .donate-card{
     background:var(--panel); border:1px solid var(--border); border-radius:14px;
@@ -70,7 +73,7 @@
   .donate-title{font-size:14px;font-weight:800;margin-bottom:4px}
   .donate-copy{font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:8px}
   .donate-frame{
-    width:100%; height:300px; border:none; border-radius:10px; background:#f9f9f9;
+    width:100%; height:560px; border:none; border-radius:10px; background:#f9f9f9;
   }
   .donate-mobile{
     display:none; margin-top:10px;
@@ -83,8 +86,8 @@
   }
   .donate-mobile-panel.open{display:block}
   .donate-mobile-panel .donate-frame{height:520px}
-  @media(max-width:760px){
-    .topbar{display:block}
+  @media(max-width:980px){
+    .page-layout{display:block;max-width:760px}
     .donate-desktop{display:none}
     .donate-mobile{display:block}
   }
@@ -92,24 +95,14 @@
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="topbar">
+<div class="page-layout">
+<main class="wrap">
+  <header class="topbar">
     <div style="flex:1;min-width:0">
       <h1>Forge Master Chat Formatter</h1>
       <div class="sub">Generates the 5-digit color syntax you confirmed works: <code>&lt;#12345/&gt;text</code></div>
     </div>
-
-    <div class="donate-desktop">
-      <div class="donate-card">
-        <div class="donate-title">Optional tip</div>
-        <div class="donate-copy">The formatter is free. If it saved you time, you can optionally support it here.</div>
-        <iframe id="kofiframe-desktop"
-          src="https://ko-fi.com/bengarii/?hidefeed=true&widget=true&embed=true&preview=true"
-          class="donate-frame"
-          title="Support bengarii on Ko-fi"></iframe>
-      </div>
-    </div>
-  </div>
+  </header>
 
   <div class="card">
     <label for="text">Text</label>
@@ -195,6 +188,18 @@
     Pink/Purple: <code>F111F</code> · White: <code>FFFFF</code> · Near-black: <code>11111</code>.<br><br>
     <span class="warn">Forge Master moderation can block some strings, especially some patterns containing many zeros. The formatter cannot guarantee the game accepts every generated combination.</span>
   </div>
+</main>
+
+<aside class="donate-desktop" aria-label="Optional donation">
+  <div class="donate-card">
+    <div class="donate-title">Optional tip</div>
+    <div class="donate-copy">The formatter is free. If it saved you time, you can optionally support it here.</div>
+    <iframe id="kofiframe-desktop"
+      src="https://ko-fi.com/bengarii/?hidefeed=true&widget=true&embed=true&preview=true"
+      class="donate-frame"
+      title="Support bengarii on Ko-fi"></iframe>
+  </div>
+</aside>
 </div>
 
 <script>
