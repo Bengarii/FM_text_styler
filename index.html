@@ -56,11 +56,18 @@
   }
   .experimental-palette .swatch{min-height:34px;padding:4px;font-size:10px}
   .swatch{
+    position:relative;
     min-height:44px;border-radius:9px;border:2px solid transparent;padding:6px;
     display:flex;align-items:center;justify-content:center;
     font-size:12px;font-weight:800;cursor:pointer;color:#fff;text-shadow:0 1px 2px #000;
   }
   .swatch.selected{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
+  .order-badge{
+    display:none;position:absolute;right:3px;bottom:2px;max-width:calc(100% - 6px);
+    padding:1px 4px;border-radius:999px;background:#080a0f;color:#fff;
+    font-size:9px;line-height:1.35;text-shadow:none;white-space:nowrap;overflow:hidden;
+  }
+  .swatch.in-pattern .order-badge{display:block}
   .no-color-swatch{
     background:repeating-linear-gradient(135deg,#fff 0 8px,#c8ceda 8px 16px)!important;
     color:#111!important;text-shadow:none;
@@ -69,22 +76,37 @@
     margin-bottom:10px;padding:9px 10px;border-radius:9px;
     background:var(--panel2);line-height:1.45;
   }
-  .pattern-sequence{
-    min-height:46px;display:flex;flex-wrap:wrap;gap:7px;align-items:center;
-    padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--panel2);
-  }
-  .pattern-chip{
-    min-height:30px;display:inline-flex;align-items:center;gap:5px;
-    padding:5px 8px;border:1px solid var(--border);border-radius:999px;
-    font-size:11px;font-weight:800;text-shadow:0 1px 2px #000;
-  }
-  .pattern-chip.no-color{color:#111;text-shadow:none;background:#fff}
+  .solid-pattern-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 12px}
+  .pattern-sequence{min-height:28px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;flex:1}
+  .pattern-dot{width:24px;height:24px;flex:0 0 24px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px var(--border)}
+  .pattern-dot.no-color{background:repeating-linear-gradient(135deg,#fff 0 5px,#c8ceda 5px 10px)}
+  .pattern-actions{display:flex;gap:5px;flex-wrap:wrap}
+  .pattern-actions button{width:auto;padding:7px 9px;font-size:11px}
   .selection-status{margin:10px 0;line-height:1.45}
-  .preview{
-    background:#4a5368;border-radius:10px;padding:12px;min-height:48px;
-    font-size:20px;font-weight:800;word-break:break-word;
+  .composer-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px}
+  .composer-tab{padding:9px;background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+  .composer-tab.active{background:var(--accent);color:#001522;border-color:transparent}
+  .editor-shell{position:relative;min-height:160px}
+  .editor-input{
+    position:relative;z-index:2;display:block;min-height:160px;margin:0;
+    padding:12px;font-size:18px;line-height:1.45;white-space:pre-wrap;
   }
-  .code{min-height:140px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px}
+  .editor-input.preview-editing{
+    background:transparent;color:transparent;caret-color:#fff;
+    -webkit-text-fill-color:transparent;
+  }
+  .editor-preview{
+    position:absolute;z-index:1;inset:0;overflow:hidden;pointer-events:none;
+    padding:12px;border:1px solid var(--border);border-radius:10px;background:#4a5368;
+    font-size:18px;font-weight:800;line-height:1.45;white-space:pre-wrap;word-break:break-word;
+  }
+  .syntax-input{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;background:var(--panel2)}
+  .composer-options{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .inline-check{display:flex;gap:8px;align-items:center;padding:8px 9px;border:1px solid var(--border);border-radius:9px;background:var(--panel2)}
+  .inline-check input{width:auto;transform:scale(1.15)}
+  .inline-check label{margin:0;color:var(--text);font-size:12px}
+  .copy-row{margin-top:10px}
+  [hidden]{display:none!important}
   .note{font-size:12px;color:var(--muted);line-height:1.45}
   .warn{color:#ffd37a}
   .tiny{font-size:12px;color:var(--muted)}
@@ -100,37 +122,19 @@
   @media(max-width:520px){
     .grid{grid-template-columns:1fr}
     .palette{grid-template-columns:repeat(2,1fr)}
+    .composer-options{grid-template-columns:1fr}
   }
 
   .topbar{display:block}
-  .donate-desktop{
-    width:340px; position:fixed; top:16px; left:calc(50% + 400px);
-    transform:scale(.78); transform-origin:top left;
-  }
-  .donate-card{
-    background:var(--panel); border:1px solid var(--border); border-radius:14px;
-    padding:10px;
-  }
   .donate-title{font-size:14px;font-weight:800;margin-bottom:4px}
   .donate-copy{font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:8px}
   .donate-frame{
     width:100%; height:560px; border:none; border-radius:10px; background:#f9f9f9;
   }
-  .donate-mobile{
-    display:none; margin-top:10px;
-  }
-  .donate-mobile button{
-    background:var(--panel2); color:var(--text); border:1px solid var(--border);
-  }
-  .donate-mobile-panel{
-    display:none; margin-top:10px;
-  }
-  .donate-mobile-panel.open{display:block}
-  .donate-mobile-panel .donate-frame{height:520px}
-  @media(max-width:1340px){
-    .donate-desktop{display:none}
-    .donate-mobile{display:block}
-  }
+  .donate-bottom button{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+  .donate-panel{display:none;margin-top:10px}
+  .donate-panel.open{display:block}
+  @media(max-width:520px){.donate-frame{height:520px}}
 
 </style>
 </head>
@@ -140,13 +144,43 @@
   <header class="topbar">
     <div style="flex:1;min-width:0">
       <h1>Forge Master Chat Formatter</h1>
-      <div class="sub">Generates the 5-digit color syntax you confirmed works: <code>&lt;#12345/&gt;text</code></div>
+      <div class="sub">Generates the in-game color syntax for you to copy + paste directly</div>
     </div>
   </header>
 
   <div class="card">
-    <label for="text">Text</label>
-    <textarea id="text" placeholder="Type something...">Bengarii</textarea>
+    <div class="composer-tabs" role="tablist" aria-label="Message view">
+      <button type="button" class="composer-tab active" data-view="preview" role="tab" aria-selected="true">Preview</button>
+      <button type="button" class="composer-tab" data-view="raw" role="tab" aria-selected="false">Raw Text</button>
+      <button type="button" class="composer-tab" data-view="syntax" role="tab" aria-selected="false">Full Syntax</button>
+    </div>
+
+    <div id="editorShell" class="editor-shell">
+      <div id="preview" class="editor-preview" aria-hidden="true"></div>
+      <textarea id="text" class="editor-input preview-editing" placeholder="Type something..." aria-label="Message text">Bengarii</textarea>
+      <textarea id="output" class="editor-input syntax-input" aria-label="Full generated syntax" readonly hidden></textarea>
+    </div>
+
+    <div class="composer-options">
+      <div class="inline-check">
+        <input type="checkbox" id="newlineEach">
+        <label for="newlineEach">Newline per char</label>
+      </div>
+      <div class="inline-check">
+        <input type="checkbox" id="newlineSpaces">
+        <label for="newlineSpaces">Newline after space</label>
+      </div>
+    </div>
+
+    <div class="copy-row">
+      <button id="copyBtn">Copy code</button>
+    </div>
+    <div id="lengthCount" class="tiny length-count"></div>
+    <div id="status" class="tiny" style="margin-top:8px"></div>
+    <div id="copyWarning" class="copy-warning" role="alert" aria-live="assertive">
+      <strong>WARNING: Message too long!</strong>
+      <div>Tip: Reduce the amount of colors, or increase character count per color to reduce message size.</div>
+    </div>
   </div>
 
   <div class="card">
@@ -159,8 +193,25 @@
 
     <div id="solidBox" style="display:none;margin-top:12px">
       <div class="tiny solid-help">
-        Tap colors with no text selected to build a repeating order. To color only part of the message, highlight words or characters in the text box above, then tap a color. This works with phone selection handles.
+        Tap colors with no text selected to build a repeating order. To color only part of the message, highlight words or characters in the editor above, then tap a color.
       </div>
+
+      <label for="solidUnit">Repeat the chosen order by</label>
+      <select id="solidUnit">
+        <option value="words" selected>Word</option>
+        <option value="characters">Non-space character</option>
+      </select>
+
+      <label style="margin-top:10px">Chosen color order</label>
+      <div class="solid-pattern-row">
+        <div id="solidPattern" class="pattern-sequence"></div>
+        <div class="pattern-actions">
+          <button id="undoSolidColor" type="button" class="secondary">Undo</button>
+          <button id="clearSolidPattern" type="button" class="secondary">Clear order</button>
+          <button id="clearSolidSelections" type="button" class="secondary">Clear text selections</button>
+        </div>
+      </div>
+
       <label>Quick-pick solid colors</label>
       <div class="palette" id="palette"></div>
       <details class="experimental-colors">
@@ -168,23 +219,7 @@
         <div class="tiny experimental-note">These colors use valid five-digit codes, but they may not work in-game.</div>
         <div class="palette experimental-palette" id="experimentalSolidPalette"></div>
       </details>
-
-      <div style="height:12px"></div>
-      <label for="solidUnit">Repeat the chosen order by</label>
-      <select id="solidUnit">
-        <option value="characters" selected>Non-space character</option>
-        <option value="words">Word</option>
-      </select>
-
-      <label style="margin-top:12px">Chosen color order</label>
-      <div id="solidPattern" class="pattern-sequence"></div>
-      <div class="grid" style="margin-top:8px">
-        <button id="undoSolidColor" type="button" class="secondary">Undo last color</button>
-        <button id="clearSolidPattern" type="button" class="secondary">Clear color order</button>
-      </div>
-
       <div id="selectionStatus" class="tiny selection-status">No text selection captured. Highlight text above, then tap a color.</div>
-      <button id="clearSolidSelections" type="button" class="secondary">Clear applied selections</button>
     </div>
 
     <div id="customBox" class="grid" style="display:none;margin-top:12px">
@@ -229,55 +264,17 @@
       </div>
       <div class="tiny" style="margin-top:6px">Choose 1 word for word-by-word color, or 2 words for one code per two-word group. Spaces do not count toward character groups.</div>
     </div>
-
-    <div style="height:12px"></div>
-    <div class="row">
-      <input type="checkbox" id="newlineEach">
-      <label for="newlineEach">Add literal <code>\n</code> after every character</label>
-    </div>
-    <div style="height:8px"></div>
-    <div class="row">
-      <input type="checkbox" id="newlineSpaces">
-      <label for="newlineSpaces">Add <code>\n</code> after spaces (one word per line)</label>
-    </div>
-    <div style="height:8px"></div>
-    <div class="row">
-      <input type="checkbox" id="safeZeros">
-      <label for="safeZeros">Experimental moderation-safe mode: replace 0 with 1</label>
-    </div>
-    <div class="tiny" style="margin-top:6px">Only use the last option if a message is blocked; it changes the color.</div>
   </div>
 
-  <div class="card">
-    <label>Preview (approximate only)</label>
-    <div class="preview" id="preview"></div>
-  </div>
-
-  <div class="card">
-    <label for="output">Copy/paste code</label>
-    <textarea id="output" class="code" readonly></textarea>
-    <div id="lengthCount" class="tiny length-count"></div>
-    <div class="grid" style="margin-top:10px">
-      <button id="copyBtn">Copy code</button>
-      <button class="secondary" id="selectBtn">Select code</button>
-    </div>
-    <div id="status" class="tiny" style="margin-top:8px"></div>
-    <div id="copyWarning" class="copy-warning" role="alert" aria-live="assertive">
-      <strong>WARNING: Message too long!</strong>
-      <div>Tip: Reduce the amount of colors, or increase character count per color to reduce message size.</div>
-    </div>
-
-    <div class="donate-mobile">
-      <button id="donateToggle" class="secondary">Hide donation option</button>
-      <div class="tiny" style="margin-top:6px">
-        Your formatted text is free and already available above. Tipping is completely optional.
-      </div>
-      <div id="donatePanel" class="donate-mobile-panel open">
-        <iframe id="kofiframe-mobile"
-          src="https://ko-fi.com/bengarii/?hidefeed=true&widget=true&embed=true&preview=true"
-          class="donate-frame"
-          title="Support bengarii on Ko-fi"></iframe>
-      </div>
+  <div class="card donate-bottom">
+    <div class="donate-title">Optional tip</div>
+    <div class="donate-copy">The formatter is free. If it saved you time, you can optionally support it here.</div>
+    <button id="donateToggle" type="button" class="secondary">Show donation option</button>
+    <div id="donatePanel" class="donate-panel">
+      <iframe id="kofiframe"
+        src="https://ko-fi.com/bengarii/?hidefeed=true&widget=true&embed=true&preview=true"
+        class="donate-frame"
+        title="Support bengarii on Ko-fi"></iframe>
     </div>
   </div>
 
@@ -289,17 +286,6 @@
     <span class="warn">Forge Master moderation can block some strings, especially some patterns containing many zeros. The formatter cannot guarantee the game accepts every generated combination.</span>
   </div>
 </main>
-
-<aside class="donate-desktop" aria-label="Optional donation">
-  <div class="donate-card">
-    <div class="donate-title">Optional tip</div>
-    <div class="donate-copy">The formatter is free. If it saved you time, you can optionally support it here.</div>
-    <iframe id="kofiframe-desktop"
-      src="https://ko-fi.com/bengarii/?hidefeed=true&widget=true&embed=true&preview=true"
-      class="donate-frame"
-      title="Support bengarii on Ko-fi"></iframe>
-  </div>
-</aside>
 </div>
 
 <script>
@@ -337,6 +323,7 @@ let solidSelections = [];
 let savedTextSelection = null;
 let solidSelectionSource = "";
 let warnedOutput = "";
+let activeComposerView = "preview";
 const $ = id => document.getElementById(id);
 
 function hexDigit(c){ return parseInt(c,16); }
@@ -443,16 +430,34 @@ function getPaletteCss(code){
 
 function renderSolidPattern(){
   if(!solidPattern.length){
-    $("solidPattern").innerHTML='<span class="tiny">No repeating colors chosen. Text remains uncolored unless a selection override is applied.</span>';
+    $("solidPattern").innerHTML='<span class="tiny">None yet</span>';
+    updateSolidOrderBadges();
     return;
   }
 
   $("solidPattern").innerHTML=solidPattern.map((code,index)=>{
-    if(code===null) return `<span class="pattern-chip no-color">${index+1}. No color</span>`;
+    if(code===null) return `<span class="pattern-dot no-color" title="${index+1}. No color"></span>`;
     const css=getPaletteCss(code);
-    const textColor=getSwatchTextColor(css);
-    return `<span class="pattern-chip" style="background:${css};color:${textColor}">${index+1}. ${code}</span>`;
+    return `<span class="pattern-dot" style="background:${css}" title="${index+1}. ${code}"></span>`;
   }).join("");
+  updateSolidOrderBadges();
+}
+
+function updateSolidOrderBadges(){
+  const positions=new Map();
+  solidPattern.forEach((code,index)=>{
+    const key=code===null ? "":code;
+    if(!positions.has(key)) positions.set(key,[]);
+    positions.get(key).push(index+1);
+  });
+
+  ["palette","experimentalSolidPalette"].forEach(containerId=>{
+    document.querySelectorAll(`#${containerId} .swatch`).forEach(swatch=>{
+      const order=positions.get(swatch.dataset.code) || [];
+      swatch.classList.toggle("in-pattern",order.length>0);
+      if(swatch._orderBadge) swatch._orderBadge.textContent=order.join(",");
+    });
+  });
 }
 
 function updateSelectionStatus(){
@@ -582,19 +587,17 @@ function render(){
   }
   const newlineEach = $("newlineEach").checked;
   const newlineSpaces = $("newlineSpaces").checked;
-  const safeZeros = $("safeZeros").checked;
 
   let out="", preview="", hasActiveColor=false;
   runs.forEach(run=>{
     let outputCode=run.code;
     if(outputCode===null && hasActiveColor) outputCode="FFFFF";
     if(outputCode!==null){
-      if(safeZeros) outputCode=outputCode.replaceAll("0","1");
       out += `<#${outputCode}/>`;
       hasActiveColor=true;
     }
 
-    const previewColor=run.code===null ? "var(--text)":approxCss(safeZeros ? run.code.replaceAll("0","1"):run.code);
+    const previewColor=run.code===null ? "var(--text)":approxCss(run.code);
     [...run.text].forEach(ch=>{
       out += ch;
       const addBreak = (newlineEach && ch !== " ") || (newlineSpaces && ch === " ");
@@ -609,6 +612,21 @@ function render(){
   updateLengthUI(out);
   if(outputChanged) resetCopyWarning();
   $("preview").innerHTML = preview || "&nbsp;";
+}
+
+function setComposerView(view){
+  activeComposerView=view;
+  const showSyntax=view==="syntax";
+  $("text").hidden=showSyntax;
+  $("output").hidden=!showSyntax;
+  $("preview").hidden=view!=="preview";
+  $("text").classList.toggle("preview-editing",view==="preview");
+
+  document.querySelectorAll(".composer-tab").forEach(tab=>{
+    const active=tab.dataset.view===view;
+    tab.classList.toggle("active",active);
+    tab.setAttribute("aria-selected",active ? "true":"false");
+  });
 }
 
 function escapeHtml(s){
@@ -658,7 +676,14 @@ function createCodePalette(containerId,colors,groupId,getSelected,onSelect){
     d.dataset.code=code;
     d.style.background=css;
     d.style.color=getSwatchTextColor(css);
-    d.textContent=name ? `${name} ${code}`:code;
+    const label=document.createElement("span");
+    label.className="swatch-label";
+    label.textContent=name ? `${name} ${code}`:code;
+    const badge=document.createElement("span");
+    badge.className="order-badge";
+    d._orderBadge=badge;
+    d.appendChild(label);
+    d.appendChild(badge);
     d.onclick=()=>{
       onSelect(code);
       syncPaletteSelection(groupId,code);
@@ -678,7 +703,14 @@ createCodePalette("experimentalEndPalette",EXPERIMENTAL_PALETTE,"end",()=>$("end
 const noColorSwatch=document.createElement("div");
 noColorSwatch.className="swatch no-color-swatch";
 noColorSwatch.dataset.code="";
-noColorSwatch.textContent="No color";
+const noColorLabel=document.createElement("span");
+noColorLabel.className="swatch-label";
+noColorLabel.textContent="No color";
+const noColorBadge=document.createElement("span");
+noColorBadge.className="order-badge";
+noColorSwatch._orderBadge=noColorBadge;
+noColorSwatch.appendChild(noColorLabel);
+noColorSwatch.appendChild(noColorBadge);
 noColorSwatch.onclick=()=>{
   handleSolidColorChoice(null);
   syncPaletteSelection("solid",null);
@@ -703,8 +735,12 @@ function handleTextChange(){
 }
 textControl.addEventListener("input",handleTextChange);
 textControl.addEventListener("change",handleTextChange);
+textControl.addEventListener("scroll",()=>{
+  $("preview").scrollTop=textControl.scrollTop;
+  $("preview").scrollLeft=textControl.scrollLeft;
+});
 
-["mode","startCode","endCode","stepSize","stepUnit","solidUnit","newlineEach","newlineSpaces","safeZeros"].forEach(id=>{
+["mode","startCode","endCode","stepSize","stepUnit","solidUnit","newlineEach","newlineSpaces"].forEach(id=>{
   const handleChange = id==="mode" ? updateModeUI : ()=>{
     if(id==="startCode") syncPaletteSelection("start",$("startCode").value);
     if(id==="endCode") syncPaletteSelection("end",$("endCode").value);
@@ -712,6 +748,10 @@ textControl.addEventListener("change",handleTextChange);
   };
   $(id).addEventListener("input",handleChange);
   $(id).addEventListener("change",handleChange);
+});
+
+document.querySelectorAll(".composer-tab").forEach(tab=>{
+  tab.onclick=()=>setComposerView(tab.dataset.view);
 });
 
 $("undoSolidColor").onclick=()=>{
@@ -741,6 +781,7 @@ async function copyOutput(out){
     await navigator.clipboard.writeText(out.value);
     return true;
   }catch(e){
+    setComposerView("syntax");
     out.focus(); out.select();
     try{return document.execCommand("copy");}
     catch(_){return false;}
@@ -755,7 +796,7 @@ $("copyBtn").onclick=async()=>{
 
   const copied = await copyOutput(out);
   if(!copied){
-    $("status").textContent="Clipboard blocked by browser. Use Select code, then Copy.";
+    $("status").textContent="Clipboard blocked by browser. Full Syntax is selected so you can copy it manually.";
   }else if(firstWarning){
     $("status").textContent="Copied. Please review the length warning below.";
   }else if(tooLong){
@@ -765,25 +806,19 @@ $("copyBtn").onclick=async()=>{
   }
 };
 
-$("selectBtn").onclick=()=>{
-  const out=$("output"); out.focus(); out.select();
-  out.setSelectionRange(0, out.value.length);
-  $("status").textContent="Selected. Use your phone's Copy action.";
-};
-
-
 const donateToggle = $("donateToggle");
 if(donateToggle){
   donateToggle.onclick=()=>{
     const panel=$("donatePanel");
     const open=panel.classList.toggle("open");
-    donateToggle.textContent = open ? "Hide donation option" : "Optional: tip €5";
+    donateToggle.textContent = open ? "Hide donation option" : "Show donation option";
   };
 }
 
 renderSolidPattern();
 updateSelectionStatus();
 updateModeUI();
+setComposerView("preview");
 render();
 </script>
 </body>
