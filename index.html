@@ -151,7 +151,7 @@
   .inline-check input{width:auto;transform:scale(1.15)}
   .inline-check label{margin:0;color:var(--text);font-size:12px}
   .rainbow-row{width:max-content;margin:9px auto 0;padding:6px 9px}
-  .copy-row{margin-top:10px}
+  .copy-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
   [hidden]{display:none!important}
   .note{font-size:12px;color:var(--muted);line-height:1.45}
   .warn{color:#ffd37a}
@@ -176,7 +176,9 @@
     .frequency-line .segment-buttons{width:100px;flex-basis:100px}
   }
 
-  .topbar{display:block}
+  .topbar{display:flex;align-items:flex-start;gap:10px}
+  .my-art-open{width:auto;flex:0 0 auto;padding:7px 10px;font-size:11px;white-space:nowrap}
+  .my-art-count{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;margin-left:4px;padding:0 4px;border-radius:999px;background:#111722;color:var(--text);font-size:9px}
   .donate-title{font-size:14px;font-weight:800;margin-bottom:4px}
   .donate-copy{font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:8px}
   .donate-frame{
@@ -185,6 +187,34 @@
   .donate-bottom button{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
   .donate-panel{display:none;margin-top:10px}
   .donate-panel.open{display:block}
+  body.modal-open{overflow:hidden}
+  .my-art-backdrop{
+    position:fixed;z-index:100;inset:0;display:grid;place-items:center;padding:16px;
+    background:rgba(5,7,11,.78);backdrop-filter:blur(3px);
+  }
+  .my-art-dialog{
+    width:min(560px,100%);max-height:min(720px,calc(100vh - 32px));overflow:auto;
+    padding:14px;border:1px solid #4b566c;border-radius:14px;background:var(--panel);
+    box-shadow:0 20px 60px rgba(0,0,0,.6);
+  }
+  .my-art-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px}
+  .my-art-header h2{margin:0;font-size:18px}
+  .my-art-close{width:auto;padding:6px 9px;font-size:11px}
+  .my-art-save{display:grid;grid-template-columns:1fr auto;gap:7px;margin:11px 0 5px}
+  .my-art-save input{min-width:0;padding:8px 9px;font-size:12px}
+  .my-art-save button{width:auto;padding:8px 11px;font-size:11px}
+  .my-art-status{min-height:18px;margin:3px 0 7px;font-size:11px;color:var(--muted)}
+  .my-art-status.error{color:var(--danger)}
+  .my-art-list{display:grid;gap:7px}
+  .my-art-empty{padding:18px 10px;border:1px dashed var(--border);border-radius:10px;text-align:center;color:var(--muted);font-size:12px}
+  .my-art-item{padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--panel2)}
+  .my-art-item-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .my-art-name{font-size:13px;font-weight:800;word-break:break-word}
+  .my-art-meta{margin-top:2px;font-size:9px;color:var(--muted)}
+  .my-art-preview{margin:7px 0;padding:7px;border-radius:7px;background:#171b23;color:var(--text);font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:70px;overflow:hidden}
+  .my-art-actions{display:flex;justify-content:flex-end;gap:5px}
+  .my-art-actions button{width:auto;padding:6px 9px;font-size:10px}
+  .my-art-delete{color:#ffb5b5!important}
   @media(max-width:520px){.donate-frame{height:520px}}
 
 </style>
@@ -197,6 +227,7 @@
       <h1>Forge Master Chat Formatter</h1>
       <div class="sub">Generates the in-game color syntax for you to copy + paste directly</div>
     </div>
+    <button id="myArtOpen" type="button" class="secondary my-art-open">My Art <span id="myArtCount" class="my-art-count">0</span></button>
   </header>
 
   <div class="card" id="composerCard">
@@ -336,6 +367,7 @@
 
     <div class="copy-row">
       <button id="copyBtn">Copy code</button>
+      <button id="saveArtBtn" type="button" class="secondary">Save to My Art</button>
     </div>
     <div id="status" class="tiny" style="margin-top:8px"></div>
     <div id="copyWarning" class="copy-warning" role="alert" aria-live="assertive">
@@ -364,6 +396,22 @@
     <span class="warn">Forge Master moderation can block some strings, especially some patterns containing many zeros. The formatter cannot guarantee the game accepts every generated combination.</span>
   </div>
 </main>
+</div>
+
+<div id="myArtModal" class="my-art-backdrop" role="dialog" aria-modal="true" aria-labelledby="myArtTitle" hidden>
+  <div class="my-art-dialog">
+    <div class="my-art-header">
+      <h2 id="myArtTitle">My Art</h2>
+      <button id="myArtClose" type="button" class="secondary my-art-close">Close</button>
+    </div>
+    <div class="tiny">Saved locally in this browser until you clear this site’s browser data.</div>
+    <div class="my-art-save">
+      <input id="myArtName" maxlength="60" placeholder="Name this creation" aria-label="Creation name">
+      <button id="myArtSaveCurrent" type="button">Save current</button>
+    </div>
+    <div id="myArtStatus" class="my-art-status" aria-live="polite"></div>
+    <div id="myArtList" class="my-art-list"></div>
+  </div>
 </div>
 
 <script>
@@ -395,6 +443,7 @@ EXPERIMENTAL_LEVELS.forEach(r=>{
 
 const RAINBOW = ["F0000","F0800","F0F00","08F00","00F00","00F0F","0000F","F111F"];
 const MAX_MESSAGE_LENGTH = 275;
+const MY_ART_STORAGE_KEY = "forgeMasterMyArt.v1";
 
 let solidColor = null;
 let solidPattern = [];
@@ -404,6 +453,8 @@ let solidSelectionSource = "";
 let warnedOutput = "";
 let activeComposerView = "preview";
 let openPicker = null;
+let myArtTemplates = [];
+let myArtStorageAvailable = true;
 const $ = id => document.getElementById(id);
 
 function hexDigit(c){ return parseInt(c,16); }
@@ -738,6 +789,170 @@ function escapeHtml(s){
   return s.replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 }
 
+function showMyArtStatus(message,isError=false){
+  $("myArtStatus").textContent=message;
+  $("myArtStatus").classList.toggle("error",isError);
+}
+
+function updateMyArtCount(){
+  $("myArtCount").textContent=String(myArtTemplates.length);
+}
+
+function loadMyArtTemplates(){
+  try{
+    if(typeof localStorage==="undefined") throw new Error("Local storage is unavailable");
+    const saved=JSON.parse(localStorage.getItem(MY_ART_STORAGE_KEY) || "[]");
+    myArtTemplates=Array.isArray(saved) ? saved.filter(item=>
+      item && typeof item.id==="string" && typeof item.name==="string" &&
+      typeof item.syntax==="string" && typeof item.text==="string"
+    ).slice(0,100):[];
+    myArtStorageAvailable=true;
+  }catch(_){
+    myArtTemplates=[];
+    myArtStorageAvailable=false;
+  }
+  updateMyArtCount();
+}
+
+function persistMyArtTemplates(nextTemplates){
+  try{
+    if(typeof localStorage==="undefined") throw new Error("Local storage is unavailable");
+    localStorage.setItem(MY_ART_STORAGE_KEY,JSON.stringify(nextTemplates));
+    myArtTemplates=nextTemplates;
+    myArtStorageAvailable=true;
+    updateMyArtCount();
+    return true;
+  }catch(_){
+    myArtStorageAvailable=false;
+    showMyArtStatus("This browser blocked local saving. Check its site-data or privacy settings.",true);
+    return false;
+  }
+}
+
+function getDefaultArtName(){
+  const plain=$("text").value.replace(/\s+/gu," ").trim();
+  return [...(plain || "Untitled art")].slice(0,40).join("");
+}
+
+function createMyArtElement(tag,className,text){
+  const element=document.createElement(tag);
+  if(className) element.className=className;
+  if(text!==undefined) element.textContent=text;
+  return element;
+}
+
+function renderMyArtList(){
+  const list=$("myArtList");
+  list.replaceChildren();
+
+  if(!myArtTemplates.length){
+    list.appendChild(createMyArtElement("div","my-art-empty",myArtStorageAvailable ?
+      "Nothing saved yet. Create something fancy, then save it here.":
+      "Local saving is unavailable in this browser."));
+    return;
+  }
+
+  myArtTemplates.forEach(template=>{
+    const item=createMyArtElement("div","my-art-item");
+    const head=createMyArtElement("div","my-art-item-head");
+    const heading=createMyArtElement("div");
+    heading.appendChild(createMyArtElement("div","my-art-name",template.name));
+    const savedDate=Number.isFinite(template.savedAt) ? new Date(template.savedAt).toLocaleDateString():"Saved";
+    heading.appendChild(createMyArtElement("div","my-art-meta",`${[...template.syntax].length} characters · ${savedDate}`));
+    head.appendChild(heading);
+    item.appendChild(head);
+
+    const source=template.text || template.syntax;
+    const preview=[...source].slice(0,180).join("") + ([...source].length>180 ? "…":"");
+    item.appendChild(createMyArtElement("div","my-art-preview",preview));
+
+    const actions=createMyArtElement("div","my-art-actions");
+    const copyButton=createMyArtElement("button","secondary","Copy");
+    copyButton.type="button";
+    copyButton.dataset.artCopy=template.id;
+    copyButton.onclick=()=>copySavedArt(template);
+    const deleteButton=createMyArtElement("button","secondary my-art-delete","Delete");
+    deleteButton.type="button";
+    deleteButton.dataset.artDelete=template.id;
+    deleteButton.onclick=()=>deleteSavedArt(template.id);
+    actions.appendChild(copyButton);
+    actions.appendChild(deleteButton);
+    item.appendChild(actions);
+    list.appendChild(item);
+  });
+}
+
+function openMyArt(prepareToSave=false){
+  renderMyArtList();
+  $("myArtModal").hidden=false;
+  document.body.classList.add("modal-open");
+  showMyArtStatus(myArtStorageAvailable ? "":"This browser currently blocks local saving.",!myArtStorageAvailable);
+  if(prepareToSave){
+    $("myArtName").value=getDefaultArtName();
+    $("myArtName").focus();
+    $("myArtName").select();
+  }
+}
+
+function closeMyArt(){
+  $("myArtModal").hidden=true;
+  document.body.classList.remove("modal-open");
+}
+
+function saveCurrentArt(){
+  const syntax=$("output").value;
+  if(!syntax){
+    showMyArtStatus("There is nothing to save yet.",true);
+    return;
+  }
+  const name=$("myArtName").value.trim() || getDefaultArtName();
+  const template={
+    id:`${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
+    name,
+    text:$("text").value,
+    syntax,
+    savedAt:Date.now(),
+  };
+  if(!persistMyArtTemplates([template,...myArtTemplates].slice(0,100))) return;
+  $("myArtName").value="";
+  renderMyArtList();
+  showMyArtStatus(`Saved “${name}”.`);
+}
+
+async function copyTextValue(value){
+  try{
+    await navigator.clipboard.writeText(value);
+    return true;
+  }catch(_){
+    const fallback=document.createElement("textarea");
+    fallback.value=value;
+    fallback.setAttribute("readonly","");
+    fallback.style.position="fixed";
+    fallback.style.opacity="0";
+    document.body.appendChild(fallback);
+    fallback.focus();
+    fallback.select();
+    let copied=false;
+    try{copied=document.execCommand("copy");}catch(_error){copied=false;}
+    fallback.remove();
+    return copied;
+  }
+}
+
+async function copySavedArt(template){
+  const copied=await copyTextValue(template.syntax);
+  showMyArtStatus(copied ? `Copied “${template.name}”.`:"Clipboard access was blocked.",!copied);
+}
+
+function deleteSavedArt(id){
+  const template=myArtTemplates.find(item=>item.id===id);
+  if(!template || !window.confirm(`Delete “${template.name}” from My Art?`)) return;
+  const next=myArtTemplates.filter(item=>item.id!==id);
+  if(!persistMyArtTemplates(next)) return;
+  renderMyArtList();
+  showMyArtStatus(`Deleted “${template.name}”.`);
+}
+
 function updateModeUI(){
   const mode=$("mode").value;
   const rainbow=mode==="solid" && $("rainbowMode").checked;
@@ -984,10 +1199,25 @@ document.addEventListener("pointerdown",()=>{
 
 document.addEventListener("keydown",event=>{
   if(event.key==="Escape" && openPicker) closeColorPicker();
+  if(event.key==="Escape" && !$("myArtModal").hidden) closeMyArt();
 });
 
 document.querySelectorAll(".composer-tab").forEach(tab=>{
   tab.onclick=()=>setComposerView(tab.dataset.view);
+});
+
+$("myArtOpen").onclick=()=>openMyArt(false);
+$("saveArtBtn").onclick=()=>openMyArt(true);
+$("myArtClose").onclick=closeMyArt;
+$("myArtSaveCurrent").onclick=saveCurrentArt;
+$("myArtName").addEventListener("keydown",event=>{
+  if(event.key==="Enter"){
+    event.preventDefault();
+    saveCurrentArt();
+  }
+});
+$("myArtModal").addEventListener("pointerdown",event=>{
+  if(event.target===$("myArtModal")) closeMyArt();
 });
 
 $("undoSolidColor").onclick=()=>{
@@ -1049,6 +1279,8 @@ if(donateToggle){
   };
 }
 
+loadMyArtTemplates();
+renderMyArtList();
 updateEndpointUI("start");
 updateEndpointUI("end");
 renderSolidPattern();
