@@ -42,12 +42,14 @@
   .row input[type=checkbox]{width:auto;transform:scale(1.2)}
   .row label{margin:0;color:var(--text)}
   .palette{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .compact-palette{grid-template-columns:repeat(3,1fr);margin-top:8px}
+  .compact-palette .swatch{min-height:40px;padding:4px;font-size:10px}
   .swatch{
     min-height:44px;border-radius:9px;border:2px solid transparent;padding:6px;
     display:flex;align-items:center;justify-content:center;
     font-size:12px;font-weight:800;cursor:pointer;color:#fff;text-shadow:0 1px 2px #000;
   }
-  .swatch.selected{border-color:#fff}
+  .swatch.selected{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
   .preview{
     background:#4a5368;border-radius:10px;padding:12px;min-height:48px;
     font-size:20px;font-weight:800;word-break:break-word;
@@ -137,10 +139,14 @@
       <div>
         <label>Start code</label>
         <input id="startCode" maxlength="5" value="F0000">
+        <label style="margin-top:9px">Allowed start colors</label>
+        <div class="palette compact-palette" id="startPalette"></div>
       </div>
       <div>
         <label>End code</label>
         <input id="endCode" maxlength="5" value="0000F">
+        <label style="margin-top:9px">Allowed end colors</label>
+        <div class="palette compact-palette" id="endPalette"></div>
       </div>
     </div>
 
@@ -420,24 +426,41 @@ function updateModeUI(){
   render();
 }
 
-PALETTE.forEach(([name,code,css])=>{
-  const d=document.createElement("div");
-  d.className="swatch"+(code===selectedSolid?" selected":"");
-  d.style.background=css;
-  d.style.color = code==="FFFFF" ? "#111":"#fff";
-  d.textContent=`${name} ${code}`;
-  d.onclick=()=>{
-    selectedSolid=code;
-    document.querySelectorAll(".swatch").forEach(x=>x.classList.remove("selected"));
-    d.classList.add("selected");
-    render();
-  };
-  $("palette").appendChild(d);
-});
+function syncPaletteSelection(containerId,selectedCode){
+  document.querySelectorAll(`#${containerId} .swatch`).forEach(swatch=>{
+    swatch.classList.toggle("selected", swatch.dataset.code===selectedCode.toUpperCase());
+  });
+}
+
+function createCodePalette(containerId,getSelected,onSelect){
+  PALETTE.forEach(([name,code,css])=>{
+    const d=document.createElement("div");
+    d.className="swatch"+(code===getSelected().toUpperCase()?" selected":"");
+    d.dataset.code=code;
+    d.style.background=css;
+    d.style.color = code==="FFFFF" ? "#111":"#fff";
+    d.textContent=`${name} ${code}`;
+    d.onclick=()=>{
+      onSelect(code);
+      syncPaletteSelection(containerId,code);
+      render();
+    };
+    $(containerId).appendChild(d);
+  });
+}
+
+createCodePalette("palette",()=>selectedSolid,code=>{selectedSolid=code;});
+createCodePalette("startPalette",()=>$("startCode").value,code=>{$("startCode").value=code;});
+createCodePalette("endPalette",()=>$("endCode").value,code=>{$("endCode").value=code;});
 
 ["text","mode","startCode","endCode","stepSize","stepUnit","newlineEach","newlineSpaces","safeZeros"].forEach(id=>{
-  $(id).addEventListener("input", id==="mode" ? updateModeUI : render);
-  $(id).addEventListener("change", id==="mode" ? updateModeUI : render);
+  const handleChange = id==="mode" ? updateModeUI : ()=>{
+    if(id==="startCode") syncPaletteSelection("startPalette",$("startCode").value);
+    if(id==="endCode") syncPaletteSelection("endPalette",$("endCode").value);
+    render();
+  };
+  $(id).addEventListener("input",handleChange);
+  $(id).addEventListener("change",handleChange);
 });
 
 async function copyOutput(out){
