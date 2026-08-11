@@ -158,6 +158,7 @@
   .tiny{font-size:12px;color:var(--muted)}
   .length-count{margin-top:7px}
   .length-count.over{color:var(--danger);font-weight:800}
+  .art-compatibility{margin-top:5px;color:#ffd37a;line-height:1.4}
   .copy-warning{
     display:none; margin-top:10px; padding:11px 12px;
     border:1px solid var(--danger); border-radius:10px; background:#2a1c22;
@@ -207,12 +208,13 @@
   .my-art-status.error{color:var(--danger)}
   .my-art-list{display:grid;gap:7px}
   .my-art-empty{padding:18px 10px;border:1px dashed var(--border);border-radius:10px;text-align:center;color:var(--muted);font-size:12px}
-  .my-art-item{padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--panel2)}
+  .my-art-item{padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--panel2);cursor:pointer}
+  .my-art-item:hover,.my-art-item:focus-within{border-color:#59657d;background:#272e3d}
   .my-art-item-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
   .my-art-name{font-size:13px;font-weight:800;word-break:break-word}
   .my-art-meta{margin-top:2px;font-size:9px;color:var(--muted)}
   .my-art-preview{margin:7px 0;padding:7px;border-radius:7px;background:#171b23;color:var(--text);font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:70px;overflow:hidden}
-  .my-art-actions{display:flex;justify-content:flex-end;gap:5px}
+  .my-art-actions{display:flex;justify-content:flex-end;gap:5px;flex-wrap:wrap}
   .my-art-actions button{width:auto;padding:6px 9px;font-size:10px}
   .my-art-delete{color:#ffb5b5!important}
   .my-art-qr-panel{padding:10px;border:1px solid var(--border);border-radius:11px;background:var(--panel2);text-align:center}
@@ -268,6 +270,7 @@
     </div>
 
     <div id="lengthCount" class="tiny length-count"></div>
+    <div id="artCompatibility" class="tiny art-compatibility" aria-live="polite" hidden></div>
 
     <div id="rainbowOption" class="inline-check rainbow-row">
       <input type="checkbox" id="rainbowMode">
@@ -411,7 +414,7 @@
       <h2 id="myArtTitle">My Art</h2>
       <button id="myArtClose" type="button" class="secondary my-art-close">Close</button>
     </div>
-    <div class="tiny">Saved locally in this browser until you clear this site’s browser data.</div>
+    <div class="tiny">Saved locally in this browser until you clear this site’s browser data. Tap a saved creation to edit it.</div>
     <div id="myArtSaveRow" class="my-art-save">
       <input id="myArtName" maxlength="60" placeholder="Name this creation" aria-label="Creation name">
       <button id="myArtSaveCurrent" type="button">Save current</button>
@@ -474,6 +477,7 @@ let openPicker = null;
 let myArtTemplates = [];
 let myArtStorageAvailable = true;
 let myArtTransferUrl = "";
+let editingArtId = null;
 const $ = id => document.getElementById(id);
 
 function hexDigit(c){ return parseInt(c,16); }
@@ -748,6 +752,23 @@ function updateLengthUI(value){
   $("lengthCount").classList.toggle("over", total > MAX_MESSAGE_LENGTH);
 }
 
+function updateArtCompatibility(text){
+  const note=$("artCompatibility");
+  const unsupported=[...new Set([...text].filter(character=>character==="◕" || character==="✧"))];
+  const hasIndentation=/^[ \t]+/mu.test(text);
+  const isMultiline=text.includes("\n");
+  const messages=[];
+
+  if(hasIndentation) messages.push("Line-leading spaces are protected automatically.");
+  if(isMultiline) messages.push("Exact alignment remains approximate because Forge Master uses variable-width characters.");
+  if(unsupported.length){
+    messages.push(`${unsupported.join(" and ")} appeared as □ in-game; try ${unsupported.includes("◕") ? "• or o":"* or +"}${unsupported.length>1 ? ", and * or +":""}.`);
+  }
+
+  note.textContent=messages.join(" ");
+  note.hidden=!messages.length;
+}
+
 function render(){
   const text = $("text").value;
   const mode = $("mode").value;
@@ -763,22 +784,37 @@ function render(){
   const newlineSpaces = $("newlineSpaces").checked;
   $("preview").classList.toggle("generated-newlines",newlineEach || newlineSpaces);
 
-  let out="", preview="", hasActiveColor=false;
+  const startsWithIndentation=/^[ \t]/u.test(text);
+  let out=startsWithIndentation ? "\\n":"", preview="", hasActiveColor=false;
+  let atLineStart=true, lineHasSyntaxPrefix=startsWithIndentation;
   runs.forEach(run=>{
     let outputCode=run.code;
     if(outputCode===null && hasActiveColor) outputCode="FFFFF";
     if(outputCode!==null){
       out += `<#${outputCode}/>`;
       hasActiveColor=true;
+      if(atLineStart) lineHasSyntaxPrefix=true;
     }
 
     const previewColor=run.code===null ? "var(--text)":approxCss(run.code);
     [...run.text].forEach(ch=>{
-      out += ch;
-      const addBreak = (newlineEach && ch !== " ") || (newlineSpaces && ch === " ");
+      if(atLineStart && (ch===" " || ch==="\t") && !lineHasSyntaxPrefix){
+        out += "<#FFFFF/>";
+        hasActiveColor=true;
+        lineHasSyntaxPrefix=true;
+      }
+      const manualBreak=ch==="\n";
+      out += manualBreak ? "\\n":ch;
+      const addBreak = !manualBreak && ((newlineEach && ch !== " ") || (newlineSpaces && ch === " "));
       if(addBreak) out += "\\n";
       preview += `<span style="color:${previewColor}">${ch===" "?"&nbsp;":escapeHtml(ch)}</span>`;
       if(addBreak) preview += "<br>";
+      if(ch==="\n"){
+        atLineStart=true;
+        lineHasSyntaxPrefix=true;
+      }else if(ch!==" " && ch!=="\t" && ch!=="\r"){
+        atLineStart=false;
+      }
     });
   });
 
@@ -787,6 +823,7 @@ function render(){
   updateLengthUI(out);
   if(outputChanged) resetCopyWarning();
   $("preview").innerHTML = preview || "&nbsp;";
+  updateArtCompatibility(text);
 }
 
 function setComposerView(view){
@@ -883,6 +920,126 @@ function syntaxToPlainText(syntax){
   return syntax.replace(/<#[0-9A-F]{5}\/>/giu,"").replace(/\\n/g,"\n");
 }
 
+function getCurrentEditorState(){
+  return {
+    version:1,
+    mode:$("mode").value,
+    solidColor,
+    solidPattern:[...solidPattern],
+    solidSelections:solidSelections.map(selection=>({...selection})),
+    patternMode:$("patternMode").checked,
+    solidUnit:$("solidUnit").value,
+    rainbowMode:$("rainbowMode").checked,
+    startCode:$("startCode").value,
+    endCode:$("endCode").value,
+    stepSize:$("stepSize").value,
+    stepUnit:$("stepUnit").value,
+    newlineEach:$("newlineEach").checked,
+    newlineSpaces:$("newlineSpaces").checked,
+  };
+}
+
+function parseSyntaxForEditing(syntax){
+  const tag=/<#([0-9A-F]{5})\/>/giu;
+  const selections=[];
+  let text="", activeCode=null, sourceIndex=0, match;
+
+  const appendChunk=chunk=>{
+    const normalized=chunk.replace(/\\n/g,"\n");
+    const start=text.length;
+    text += normalized;
+    if(activeCode!==null && text.length>start){
+      selections.push({start,end:text.length,code:activeCode});
+    }
+  };
+
+  while((match=tag.exec(syntax))!==null){
+    appendChunk(syntax.slice(sourceIndex,match.index));
+    activeCode=match[1].toUpperCase();
+    sourceIndex=tag.lastIndex;
+  }
+  appendChunk(syntax.slice(sourceIndex));
+  return {text,selections};
+}
+
+function setButtonGroupValue(selector,dataKey,value){
+  document.querySelectorAll(selector).forEach(button=>{
+    const active=button.dataset[dataKey]===value;
+    button.classList.toggle("active",active);
+    button.setAttribute("aria-pressed",active ? "true":"false");
+  });
+}
+
+function setNewlineControl(kind,checked){
+  const input=kind==="each" ? $("newlineEach"):$("newlineSpaces");
+  input.checked=Boolean(checked);
+  const button=[...document.querySelectorAll("[data-newline-toggle]")].find(item=>item.dataset.newlineToggle===kind);
+  if(button){
+    button.classList.toggle("active",input.checked);
+    button.setAttribute("aria-pressed",input.checked ? "true":"false");
+  }
+}
+
+function isValidColorCode(code){
+  return code===null || /^[0-9A-F]{5}$/i.test(String(code));
+}
+
+function restoreSavedArt(template){
+  const parsed=parseSyntaxForEditing(template.syntax);
+  const state=template.editorState && template.editorState.version===1 ? template.editorState:null;
+  const restoredText=state && typeof template.text==="string" ? template.text:parsed.text;
+
+  $("text").value=restoredText;
+  solidSelectionSource=restoredText;
+  savedTextSelection=null;
+
+  if(state){
+    solidColor=isValidColorCode(state.solidColor) ? state.solidColor:null;
+    solidPattern=Array.isArray(state.solidPattern) ? state.solidPattern.filter(isValidColorCode):[];
+    solidSelections=Array.isArray(state.solidSelections) ? state.solidSelections.filter(selection=>
+      selection && Number.isInteger(selection.start) && Number.isInteger(selection.end) &&
+      selection.start>=0 && selection.end>selection.start && selection.end<=restoredText.length &&
+      isValidColorCode(selection.code)
+    ).map(selection=>({...selection,code:selection.code===null ? null:String(selection.code).toUpperCase()})):[];
+    $("mode").value=state.mode==="gradient" ? "gradient":"solid";
+    $("patternMode").checked=Boolean(state.patternMode);
+    $("solidUnit").value=state.solidUnit==="characters" ? "characters":"words";
+    $("rainbowMode").checked=Boolean(state.rainbowMode);
+    if(/^[0-9A-F]{5}$/i.test(state.startCode || "")) $("startCode").value=state.startCode.toUpperCase();
+    if(/^[0-9A-F]{5}$/i.test(state.endCode || "")) $("endCode").value=state.endCode.toUpperCase();
+    $("stepSize").value=String(Math.max(1,Math.min(1000,parseInt(state.stepSize,10) || 1)));
+    $("stepUnit").value=state.stepUnit==="words" ? "words":"characters";
+    setNewlineControl("each",state.newlineEach);
+    setNewlineControl("spaces",state.newlineSpaces);
+  }else{
+    solidColor=null;
+    solidPattern=[];
+    solidSelections=parsed.selections;
+    $("mode").value="solid";
+    $("patternMode").checked=false;
+    $("rainbowMode").checked=false;
+    setNewlineControl("each",false);
+    setNewlineControl("spaces",false);
+  }
+
+  setButtonGroupValue("[data-solid-unit]","solidUnit",$("solidUnit").value);
+  setButtonGroupValue("[data-step-unit]","stepUnit",$("stepUnit").value);
+  updateEndpointUI("start");
+  updateEndpointUI("end");
+  renderSolidPattern();
+  updateSelectionStatus();
+  updateModeUI();
+  setComposerView("preview");
+
+  editingArtId=template.id;
+  $("saveArtBtn").textContent="Update My Art";
+  $("myArtName").value=template.name;
+  closeMyArt();
+  $("status").textContent=`Editing “${template.name}”. Save again to update it.`;
+  $("text").focus();
+  $("text").setSelectionRange(restoredText.length,restoredText.length);
+}
+
 function closeArtQr(){
   $("myArtQrPanel").hidden=true;
   $("myArtList").hidden=false;
@@ -970,6 +1127,10 @@ function renderMyArtList(){
 
   myArtTemplates.forEach(template=>{
     const item=createMyArtElement("div","my-art-item");
+    item.title=`Edit ${template.name}`;
+    item.onclick=event=>{
+      if(!event.target.closest("button")) restoreSavedArt(template);
+    };
     const head=createMyArtElement("div","my-art-item-head");
     const heading=createMyArtElement("div");
     heading.appendChild(createMyArtElement("div","my-art-name",template.name));
@@ -983,6 +1144,10 @@ function renderMyArtList(){
     item.appendChild(createMyArtElement("div","my-art-preview",preview));
 
     const actions=createMyArtElement("div","my-art-actions");
+    const editButton=createMyArtElement("button","secondary","Edit");
+    editButton.type="button";
+    editButton.dataset.artEdit=template.id;
+    editButton.onclick=()=>restoreSavedArt(template);
     const copyButton=createMyArtElement("button","secondary","Copy");
     copyButton.type="button";
     copyButton.dataset.artCopy=template.id;
@@ -995,6 +1160,7 @@ function renderMyArtList(){
     deleteButton.type="button";
     deleteButton.dataset.artDelete=template.id;
     deleteButton.onclick=()=>deleteSavedArt(template.id);
+    actions.appendChild(editButton);
     actions.appendChild(copyButton);
     actions.appendChild(qrButton);
     actions.appendChild(deleteButton);
@@ -1009,8 +1175,10 @@ function openMyArt(prepareToSave=false){
   $("myArtModal").hidden=false;
   document.body.classList.add("modal-open");
   showMyArtStatus(myArtStorageAvailable ? "":"This browser currently blocks local saving.",!myArtStorageAvailable);
+  const editingTemplate=myArtTemplates.find(template=>template.id===editingArtId);
+  $("myArtSaveCurrent").textContent=editingTemplate ? "Update":"Save current";
   if(prepareToSave){
-    $("myArtName").value=getDefaultArtName();
+    $("myArtName").value=editingTemplate ? editingTemplate.name:getDefaultArtName();
     $("myArtName").focus();
     $("myArtName").select();
   }
@@ -1030,16 +1198,24 @@ function saveCurrentArt(){
   }
   const name=$("myArtName").value.trim() || getDefaultArtName();
   const template={
-    id:`${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
+    id:editingArtId || `${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
     name,
     text:$("text").value,
     syntax,
+    editorState:getCurrentEditorState(),
     savedAt:Date.now(),
   };
-  if(!persistMyArtTemplates([template,...myArtTemplates].slice(0,100))) return;
+  const wasEditing=myArtTemplates.some(item=>item.id===editingArtId);
+  const nextTemplates=wasEditing ?
+    [template,...myArtTemplates.filter(item=>item.id!==editingArtId)]:
+    [template,...myArtTemplates];
+  if(!persistMyArtTemplates(nextTemplates.slice(0,100))) return;
+  editingArtId=template.id;
+  $("saveArtBtn").textContent="Update My Art";
+  $("myArtSaveCurrent").textContent="Update";
   $("myArtName").value="";
   renderMyArtList();
-  showMyArtStatus(`Saved “${name}”.`);
+  showMyArtStatus(`${wasEditing ? "Updated":"Saved"} “${name}”.`);
 }
 
 async function copyTextValue(value){
@@ -1072,6 +1248,11 @@ function deleteSavedArt(id){
   if(!template || !window.confirm(`Delete “${template.name}” from My Art?`)) return;
   const next=myArtTemplates.filter(item=>item.id!==id);
   if(!persistMyArtTemplates(next)) return;
+  if(editingArtId===id){
+    editingArtId=null;
+    $("saveArtBtn").textContent="Save to My Art";
+    $("myArtSaveCurrent").textContent="Save current";
+  }
   renderMyArtList();
   showMyArtStatus(`Deleted “${template.name}”.`);
 }
