@@ -8,6 +8,7 @@
   :root{
     --bg:#111318; --panel:#1b1f28; --panel2:#232936; --text:#f5f7fb;
     --muted:#a9b1c3; --accent:#26a7ff; --border:#333b4b; --danger:#ff6b6b;
+    --color-square-size:clamp(20px,calc((100vw - 96px)/10),45px);
   }
   *{box-sizing:border-box}
   body{
@@ -44,10 +45,11 @@
   .mode-button.active,.segment-button.active{background:var(--accent);color:#001522}
   .mode-controls{margin-top:10px;padding-top:11px;border-top:1px solid var(--border)}
   .solid-help{margin:0 auto 9px;max-width:500px;line-height:1.4;text-align:center}
-  .solid-unit-row{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 auto 8px}
+  .solid-unit-row{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;margin:0 auto 12px}
   .solid-unit-row>span{font-size:12px;color:var(--muted)}
-  .solid-unit-row .segment-buttons{width:160px}
-  .solid-actions{display:flex;justify-content:center;gap:5px;flex-wrap:wrap;margin:6px 0}
+  .solid-unit-row .segment-buttons{width:116px;padding:2px;gap:2px;border-radius:8px}
+  .solid-unit-row .segment-button{padding:5px 6px;font-size:10px}
+  .solid-actions{display:flex;justify-content:center;gap:5px;flex-wrap:wrap;margin:13px 0 6px}
   .solid-actions button{width:auto;padding:6px 8px;font-size:10px}
   .pattern-sequence{
     display:grid;grid-template-columns:repeat(var(--pattern-columns,1),20px);gap:5px;
@@ -62,7 +64,7 @@
     transform:rotate(-45deg);transform-origin:center;box-shadow:0 0 0 1px rgba(255,255,255,.35);
   }
   .solid-palette-wrap{max-width:500px;margin:0 auto}
-  .color-grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px}
+  .color-grid{display:grid;grid-template-columns:repeat(10,var(--color-square-size));justify-content:center;gap:5px}
   .color-swatch{
     position:relative;width:100%;min-width:0;aspect-ratio:1;border-radius:6px;
     border:2px solid transparent;padding:0;cursor:pointer;overflow:hidden;
@@ -80,16 +82,19 @@
   .experimental-palette{max-height:190px;overflow:auto;padding:3px}
   .selection-status{min-height:0;margin:7px auto 0;max-width:500px;line-height:1.35;text-align:center}
   .gradient-controls{position:relative;max-width:500px;margin:0 auto}
-  .gradient-endpoints{display:flex;align-items:center;justify-content:center;gap:15px;margin:2px 0 10px}
-  .endpoint{display:flex;align-items:center;gap:7px}
+  .gradient-endpoints{
+    display:grid;grid-template-columns:var(--color-square-size) minmax(90px,180px) var(--color-square-size);
+    align-items:end;justify-content:center;width:min(100%,360px);margin:2px auto 11px;
+  }
+  .endpoint{display:flex;flex-direction:column;align-items:center;gap:5px}
   .endpoint-label{font-size:11px;color:var(--muted)}
   .endpoint-trigger{
-    width:34px;height:34px;flex:0 0 34px;padding:0;border:2px solid #fff;border-radius:50%;
+    width:var(--color-square-size);height:var(--color-square-size);padding:0;border:2px solid #fff;border-radius:6px;
     box-shadow:0 0 0 2px var(--accent);
   }
-  .gradient-arrow{color:var(--muted);font-weight:900}
+  .gradient-arrow{align-self:end;text-align:center;color:var(--muted);font-size:25px;font-weight:900;line-height:var(--color-square-size)}
   .picker-popover{
-    position:absolute;z-index:20;top:44px;left:50%;transform:translateX(-50%);
+    position:absolute;z-index:20;top:70px;left:50%;transform:translateX(-50%);
     width:min(340px,calc(100vw - 64px));padding:10px;border:1px solid #566077;
     border-radius:12px;background:#171b23;box-shadow:0 12px 35px rgba(0,0,0,.55);
   }
@@ -106,17 +111,15 @@
   .picker-error{min-height:14px;margin-top:4px;color:var(--danger);font-size:10px}
   .frequency-slot{grid-column:1/-1}
   .frequency-slot:empty{display:none}
-  .frequency-line{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:nowrap;margin-top:8px}
-  .frequency-number{width:62px;padding:8px 9px;text-align:center}
-  .frequency-line>span{font-size:12px;color:var(--muted);white-space:nowrap}
-  .frequency-line .segment-buttons{width:130px;flex:0 0 130px}
-  .composer-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px}
-  .composer-tab{padding:9px;background:var(--panel2);color:var(--text);border:1px solid var(--border)}
-  .composer-tab.active{background:var(--accent);color:#001522;border-color:transparent}
-  .editor-shell{position:relative;min-height:160px}
+  .frequency-line{display:flex;align-items:center;justify-content:center;gap:5px;flex-wrap:nowrap;margin-top:6px}
+  .frequency-number{width:48px;padding:5px 6px;text-align:center;font-size:11px;border-radius:7px}
+  .frequency-line>span{font-size:11px;color:var(--muted);white-space:nowrap}
+  .frequency-line .segment-buttons{width:104px;flex:0 0 104px;padding:2px;gap:2px;border-radius:8px}
+  .frequency-line .segment-button{padding:4px 5px;font-size:10px}
+  .editor-shell{position:relative;min-height:170px}
   .editor-input{
-    position:relative;z-index:2;display:block;min-height:160px;margin:0;
-    padding:12px;font-size:18px;line-height:1.45;white-space:pre-wrap;
+    position:relative;z-index:2;display:block;min-height:170px;margin:0;
+    padding:12px 12px 48px;font-size:18px;line-height:1.45;white-space:pre-wrap;
   }
   .editor-input.preview-editing{
     background:transparent;color:transparent;caret-color:#fff;
@@ -124,15 +127,24 @@
   }
   .editor-preview{
     position:absolute;z-index:1;inset:0;overflow:hidden;pointer-events:none;
-    padding:12px;border:1px solid var(--border);border-radius:10px;background:#4a5368;
+    padding:12px 12px 48px;border:1px solid var(--border);border-radius:10px;background:#4a5368;
     font-size:18px;font-weight:800;line-height:1.45;white-space:pre-wrap;word-break:break-word;
   }
   .syntax-input{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;background:var(--panel2)}
-  .composer-options{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .editor-toolbar{
+    position:absolute;z-index:4;left:8px;right:8px;bottom:8px;
+    display:flex;align-items:center;justify-content:space-between;gap:8px;pointer-events:none;
+  }
+  .editor-control-group{display:flex;align-items:center;gap:3px;pointer-events:auto}
+  .editor-mini-button{
+    width:auto;padding:4px 5px;border:1px solid #4a5368;border-radius:6px;
+    background:rgba(24,29,39,.94);color:var(--text);font-size:9px;line-height:1.15;font-weight:800;
+  }
+  .editor-mini-button.active{background:var(--accent);color:#001522;border-color:transparent}
   .inline-check{display:flex;gap:8px;align-items:center;padding:8px 9px;border:1px solid var(--border);border-radius:9px;background:var(--panel2)}
   .inline-check input{width:auto;transform:scale(1.15)}
   .inline-check label{margin:0;color:var(--text);font-size:12px}
-  .rainbow-row{grid-column:1/-1}
+  .rainbow-row{width:max-content;margin:9px auto 0;padding:6px 9px}
   .copy-row{margin-top:10px}
   [hidden]{display:none!important}
   .note{font-size:12px;color:var(--muted);line-height:1.45}
@@ -148,16 +160,14 @@
   .copy-warning.open{display:block}
   .copy-warning strong{display:block;color:var(--danger);margin-bottom:3px}
   @media(max-width:520px){
-    .composer-options{grid-template-columns:1fr}
-    .rainbow-row,.frequency-slot{grid-column:1}
     .mode-switch{grid-template-columns:1fr;gap:6px}
     .solid-help{font-size:11px}
     .color-grid{gap:4px}
     .order-badge{right:1px;bottom:1px;padding:0 2px;font-size:7px}
-    .gradient-endpoints{gap:9px}
-    .endpoint{gap:5px}
-    .frequency-line{gap:5px}
-    .frequency-line .segment-buttons{width:116px;flex-basis:116px}
+    .editor-toolbar{left:6px;right:6px;bottom:6px;gap:5px}
+    .editor-control-group{gap:2px}
+    .editor-mini-button{padding:4px;font-size:8px}
+    .frequency-line .segment-buttons{width:100px;flex-basis:100px}
   }
 
   .topbar{display:block}
@@ -193,33 +203,31 @@
       <input id="mode" type="hidden" value="solid">
     </div>
 
-    <div class="composer-tabs" role="tablist" aria-label="Message view">
-      <button type="button" class="composer-tab active" data-view="preview" role="tab" aria-selected="true">Preview</button>
-      <button type="button" class="composer-tab" data-view="raw" role="tab" aria-selected="false">Raw Text</button>
-      <button type="button" class="composer-tab" data-view="syntax" role="tab" aria-selected="false">Full Syntax</button>
-    </div>
-
     <div id="editorShell" class="editor-shell">
       <div id="preview" class="editor-preview" aria-hidden="true"></div>
       <textarea id="text" class="editor-input preview-editing" placeholder="Type something..." aria-label="Message text">Bengarii</textarea>
       <textarea id="output" class="editor-input syntax-input" aria-label="Full generated syntax" readonly hidden></textarea>
+
+      <div class="editor-toolbar" aria-label="Editor controls">
+        <div class="editor-control-group" aria-label="Newline options">
+          <button type="button" class="editor-mini-button" data-newline-toggle="each" aria-pressed="false" title="Newline per character">↵ · Char</button>
+          <button type="button" class="editor-mini-button" data-newline-toggle="spaces" aria-pressed="false" title="Newline after space">Space · ↵</button>
+          <input type="checkbox" id="newlineEach" hidden>
+          <input type="checkbox" id="newlineSpaces" hidden>
+        </div>
+        <div class="editor-control-group composer-tabs" role="tablist" aria-label="Message view">
+          <button type="button" class="editor-mini-button composer-tab active" data-view="preview" role="tab" aria-selected="true" title="Preview">Preview</button>
+          <button type="button" class="editor-mini-button composer-tab" data-view="raw" role="tab" aria-selected="false" title="Raw text">Raw Text</button>
+          <button type="button" class="editor-mini-button composer-tab" data-view="syntax" role="tab" aria-selected="false" title="Full syntax">Full Syntax</button>
+        </div>
+      </div>
     </div>
 
-    <div class="composer-options">
-      <div class="inline-check">
-        <input type="checkbox" id="newlineEach">
-        <label for="newlineEach">Newline per char</label>
-      </div>
-      <div class="inline-check">
-        <input type="checkbox" id="newlineSpaces">
-        <label for="newlineSpaces">Newline after space</label>
-      </div>
-      <div id="rainbowOption" class="inline-check rainbow-row">
-        <input type="checkbox" id="rainbowMode">
-        <label for="rainbowMode">Rainbow mode</label>
-      </div>
-      <div id="rainbowFrequencySlot" class="frequency-slot"></div>
+    <div id="rainbowOption" class="inline-check rainbow-row">
+      <input type="checkbox" id="rainbowMode">
+      <label for="rainbowMode">Rainbow mode</label>
     </div>
+    <div id="rainbowFrequencySlot" class="frequency-slot"></div>
 
     <div id="lengthCount" class="tiny length-count"></div>
 
@@ -260,7 +268,7 @@
             <span class="endpoint-label">Start</span>
             <button id="startColorTrigger" type="button" class="endpoint-trigger" aria-haspopup="dialog" aria-expanded="false" aria-label="Choose start color"></button>
           </div>
-          <span class="gradient-arrow" aria-hidden="true">→</span>
+          <span class="gradient-arrow" aria-hidden="true">⟶</span>
           <div class="endpoint">
             <span class="endpoint-label">End</span>
             <button id="endColorTrigger" type="button" class="endpoint-trigger" aria-haspopup="dialog" aria-expanded="false" aria-label="Choose end color"></button>
@@ -885,6 +893,16 @@ document.querySelectorAll("[data-step-unit]").forEach(button=>{
       option.classList.toggle("active",active);
       option.setAttribute("aria-pressed",active ? "true":"false");
     });
+    render();
+  };
+});
+
+document.querySelectorAll("[data-newline-toggle]").forEach(button=>{
+  button.onclick=()=>{
+    const input=button.dataset.newlineToggle==="each" ? $("newlineEach"):$("newlineSpaces");
+    input.checked=!input.checked;
+    button.classList.toggle("active",input.checked);
+    button.setAttribute("aria-pressed",input.checked ? "true":"false");
     render();
   };
 });
