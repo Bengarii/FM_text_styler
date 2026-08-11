@@ -178,6 +178,7 @@
   }
 
   .topbar{display:flex;align-items:flex-start;gap:10px}
+  .top-actions{display:flex;align-items:center;gap:5px;flex:0 0 auto}
   .my-art-open{width:auto;flex:0 0 auto;padding:7px 10px;font-size:11px;white-space:nowrap}
   .my-art-count{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;margin-left:4px;padding:0 4px;border-radius:999px;background:#111722;color:var(--text);font-size:9px}
   .donate-title{font-size:14px;font-weight:800;margin-bottom:4px}
@@ -224,7 +225,34 @@
   .my-art-qr-copy{margin:8px 0 4px;font-size:11px;color:var(--muted);line-height:1.4}
   .my-art-qr-actions{display:flex;justify-content:center;gap:6px;margin-top:8px}
   .my-art-qr-actions button{width:auto;padding:7px 10px;font-size:10px}
+  .symbol-dialog{width:min(720px,100%)}
+  .symbol-toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,180px);gap:7px;margin:10px 0 7px}
+  .symbol-toolbar input,.symbol-toolbar select{min-width:0;padding:8px 9px;font-size:12px}
+  .symbol-filter-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .symbol-invalid-filter{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11px}
+  .symbol-invalid-filter input{width:auto}
+  .symbol-count{font-size:10px;color:var(--muted)}
+  .symbol-status{min-height:18px;margin-bottom:6px;color:var(--muted);font-size:11px}
+  .symbol-sections{display:grid;gap:12px}
+  .symbol-section-title{display:flex;justify-content:space-between;gap:8px;margin:0 0 5px;font-size:12px;color:var(--muted)}
+  .symbol-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
+  .symbol-card{padding:5px;border:1px solid var(--border);border-radius:9px;background:var(--panel2)}
+  .symbol-card.invalid{border-color:#9b772c;background:#30291d}
+  .symbol-glyph{min-height:45px;padding:5px;background:#171b23;color:var(--text);font-size:24px;line-height:1}
+  .symbol-card.invalid .symbol-glyph{color:#ffd37a}
+  .symbol-card-actions{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px}
+  .symbol-card-actions button{min-width:0;padding:4px 2px;font-size:8px}
+  .symbol-invalid-button.active{background:#8b681f;color:#fff1c2;border-color:#c89b36}
+  .invalid-symbol-preview{color:#ffd37a!important;text-decoration:underline wavy #ffd37a;text-decoration-thickness:1px}
+  .symbol-empty{padding:24px 10px;border:1px dashed var(--border);border-radius:10px;text-align:center;color:var(--muted);font-size:12px}
   @media(max-width:520px){.donate-frame{height:520px}}
+  @media(max-width:520px){
+    .topbar{align-items:flex-start}
+    .top-actions{flex-direction:column;align-items:stretch}
+    .top-actions button{padding:6px 8px;font-size:10px}
+    .symbol-toolbar{grid-template-columns:1fr}
+    .symbol-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+  }
 
 </style>
 </head>
@@ -236,7 +264,10 @@
       <h1>Forge Master Chat Formatter</h1>
       <div class="sub">Generates the in-game color syntax for you to copy + paste directly</div>
     </div>
-    <button id="myArtOpen" type="button" class="secondary my-art-open">My Art <span id="myArtCount" class="my-art-count">0</span></button>
+    <div class="top-actions">
+      <button id="symbolsOpen" type="button" class="secondary my-art-open">Symbols</button>
+      <button id="myArtOpen" type="button" class="secondary my-art-open">My Art <span id="myArtCount" class="my-art-count">0</span></button>
+    </div>
   </header>
 
   <div class="card" id="composerCard">
@@ -433,6 +464,26 @@
   </div>
 </div>
 
+<div id="symbolModal" class="my-art-backdrop" role="dialog" aria-modal="true" aria-labelledby="symbolTitle" hidden>
+  <div class="my-art-dialog symbol-dialog">
+    <div class="my-art-header">
+      <h2 id="symbolTitle">Symbol Library</h2>
+      <button id="symbolsClose" type="button" class="secondary my-art-close">Close</button>
+    </div>
+    <div class="tiny">Tap a symbol to insert it at the cursor. You can also copy it or mark it invalid for Forge Master.</div>
+    <div class="symbol-toolbar">
+      <input id="symbolSearch" type="search" placeholder="Search symbol, category, or U+ code" aria-label="Search symbols">
+      <select id="symbolCategory" aria-label="Symbol category"></select>
+    </div>
+    <div class="symbol-filter-row">
+      <label class="symbol-invalid-filter"><input id="symbolInvalidOnly" type="checkbox"> Invalid only</label>
+      <span id="symbolCount" class="symbol-count"></span>
+    </div>
+    <div id="symbolStatus" class="symbol-status" aria-live="polite"></div>
+    <div id="symbolSections" class="symbol-sections"></div>
+  </div>
+</div>
+
 <script src="qrcode-generator.js"></script>
 <script src="qrcode-generator-utf8.js"></script>
 <script>
@@ -465,6 +516,72 @@ EXPERIMENTAL_LEVELS.forEach(r=>{
 const RAINBOW = ["F0000","F0800","F0F00","08F00","00F00","00F0F","0000F","F111F"];
 const MAX_MESSAGE_LENGTH = 275;
 const MY_ART_STORAGE_KEY = "forgeMasterMyArt.v1";
+const INVALID_SYMBOL_STORAGE_KEY = "forgeMasterInvalidSymbols.v1";
+const DEFAULT_INVALID_SYMBOLS = ["◕","✧"];
+const SYMBOL_CATEGORIES = [
+  {
+    id:"lines",
+    name:"Lines & corners",
+    keywords:"line bar dash underscore horizontal vertical corner box drawing",
+    symbols:[..."─│━┃┄┅┆┇┈┉┊┋╴╵╶╷╸╹╺╻╼╽╾╿_‾‐‑–—―︱︲￣┌┐└┘┏┓┗┛├┤┬┴┼┣┫┳┻╋╭╮╯╰"],
+  },
+  {
+    id:"circles",
+    name:"Circles & shapes",
+    keywords:"circle ring round bubble shape square diamond triangle filled empty",
+    symbols:[..."○●◌◍◎◉◯〇◦∘⊙⊚⊛⊜⊝⊕⊖⊗⊘◐◑◒◓◔◕◖◗◴◵◶◷⦿◇◆◈◊□■▢▣▤▥▦▧▨▩△▲▽▼◁◀▷▶◢◣◤◥"],
+  },
+  {
+    id:"stars",
+    name:"Stars & sparkles",
+    keywords:"star sparkle flower shine glitter decoration",
+    symbols:[..."☆★✦✧✩✪✫✬✭✮✯✰✴✵✶✷✸✹✺✻✼✽✾✿❀❁❂❃❇❈※⁂＊﹡"],
+  },
+  {
+    id:"diagonals",
+    name:"Diagonals & arrows",
+    keywords:"diagonal slash backslash arrow direction movement",
+    symbols:[..."/\\／＼╱╲╳⌁⌇↖↗↘↙←→↑↓↔↕⇐⇒⇑⇓⇔⇕➜➝➞➟➠➢➣➤➥➦➧➨➩➪➫➬➭➮➯➱➲➳➴➵➶➷➸➹➺➻"],
+  },
+  {
+    id:"dots",
+    name:"Dots & details",
+    keywords:"dot point detail ellipsis tiny small punctuation",
+    symbols:[...".·•‧…⋯⋮⋰⋱⁘⁙⁚⁛⁝⁞∴∵⸬⸭⸪⸫˙˚°｡･゜ﾟ˛ˇˉˍˎˏ"],
+  },
+  {
+    id:"brackets",
+    name:"Brackets & frames",
+    keywords:"bracket frame parenthesis enclosure border quote",
+    symbols:[..."()[]{}<>〈〉《》「」『』【】〔〕〖〗〘〙〚〛⌈⌉⌊⌋⌜⌝⌞⌟〈〉❨❩❪❫❬❭❮❯❰❱"],
+  },
+  {
+    id:"arms",
+    name:"Arms & curves",
+    keywords:"arm hand curve wave kaomoji gesture limb",
+    symbols:[..."つづっッノﾉヽヾ乁งლԅᕦᕤᕙᕗᘳᘰᕕᕖ୧୨σэ⊂⊃⊆⊇⌒⌢⌣⌯⌒〜〰﹏︶︵"],
+  },
+  {
+    id:"faces",
+    name:"Faces & expressions",
+    keywords:"face eye mouth emotion smile kaomoji expression",
+    symbols:[..."^＾˘ᴗᵕωᴥヮㅅ益口Д皿∀ロᗜᗒᗣᗢᵔᵒᵎᵋᵌ꒳ᆺㅂㅁㅿ๏๑òóಠಥರಢԾ눈ಥツシッソン"],
+  },
+  {
+    id:"accents",
+    name:"Hearts & accents",
+    keywords:"heart love music weather accent check cross math decoration",
+    symbols:[..."♡♥❤❥ღ❣❦❧☼☽☾☀☁☂☄♫♪♬♩♭♮♯✓✔✕✖✚✜∞≈≋≡±÷×§¶†‡"],
+  },
+];
+const SYMBOL_LIBRARY = (()=>{
+  const seen=new Set();
+  return SYMBOL_CATEGORIES.flatMap(category=>category.symbols.slice(0,28).filter(symbol=>{
+    if(seen.has(symbol)) return false;
+    seen.add(symbol);
+    return true;
+  }).map(symbol=>({symbol,category})));
+})();
 
 let solidColor = null;
 let solidPattern = [];
@@ -478,6 +595,7 @@ let myArtTemplates = [];
 let myArtStorageAvailable = true;
 let myArtTransferUrl = "";
 let editingArtId = null;
+let invalidSymbols = new Set(DEFAULT_INVALID_SYMBOLS);
 const $ = id => document.getElementById(id);
 
 function hexDigit(c){ return parseInt(c,16); }
@@ -754,7 +872,7 @@ function updateLengthUI(value){
 
 function updateArtCompatibility(text){
   const note=$("artCompatibility");
-  const unsupported=[...new Set([...text].filter(character=>character==="◕" || character==="✧"))];
+  const unsupported=[...new Set([...text].filter(character=>invalidSymbols.has(character)))];
   const hasIndentation=/^[ \t]+/mu.test(text);
   const isMultiline=text.includes("\n");
   const messages=[];
@@ -762,7 +880,7 @@ function updateArtCompatibility(text){
   if(hasIndentation) messages.push("Line-leading spaces are protected automatically.");
   if(isMultiline) messages.push("Exact alignment remains approximate because Forge Master uses variable-width characters.");
   if(unsupported.length){
-    messages.push(`${unsupported.join(" and ")} appeared as □ in-game; try ${unsupported.includes("◕") ? "• or o":"* or +"}${unsupported.length>1 ? ", and * or +":""}.`);
+    messages.push("Invalid in-game: "+unsupported.join(" ")+". "+(unsupported.length===1 ? "It is":"They are")+" marked as unsupported and may appear as □ or ?.");
   }
 
   note.textContent=messages.join(" ");
@@ -807,7 +925,10 @@ function render(){
       out += manualBreak ? "\\n":ch;
       const addBreak = !manualBreak && ((newlineEach && ch !== " ") || (newlineSpaces && ch === " "));
       if(addBreak) out += "\\n";
-      preview += `<span style="color:${previewColor}">${ch===" "?"&nbsp;":escapeHtml(ch)}</span>`;
+      const invalidSymbol=invalidSymbols.has(ch);
+      const previewCharacter=invalidSymbol ? "□":(ch===" " ? "&nbsp;":escapeHtml(ch));
+      const invalidAttributes=invalidSymbol ? ' class="invalid-symbol-preview" title="Marked invalid: '+escapeHtml(ch)+'"':"";
+      preview += '<span'+invalidAttributes+' style="color:'+previewColor+'">'+previewCharacter+'</span>';
       if(addBreak) preview += "<br>";
       if(ch==="\n"){
         atLineStart=true;
@@ -1238,6 +1359,150 @@ async function copyTextValue(value){
   }
 }
 
+function loadInvalidSymbols(){
+  try{
+    if(typeof localStorage==="undefined") throw new Error("Local storage is unavailable");
+    const stored=localStorage.getItem(INVALID_SYMBOL_STORAGE_KEY);
+    if(stored===null){
+      invalidSymbols=new Set(DEFAULT_INVALID_SYMBOLS);
+      return;
+    }
+    const parsed=JSON.parse(stored);
+    if(!Array.isArray(parsed)) throw new Error("Invalid symbol data");
+    invalidSymbols=new Set(parsed.filter(symbol=>typeof symbol==="string" && symbol.length<=4));
+  }catch(_){
+    invalidSymbols=new Set(DEFAULT_INVALID_SYMBOLS);
+  }
+}
+
+function persistInvalidSymbols(){
+  try{
+    if(typeof localStorage==="undefined") throw new Error("Local storage is unavailable");
+    localStorage.setItem(INVALID_SYMBOL_STORAGE_KEY,JSON.stringify([...invalidSymbols]));
+    return true;
+  }catch(_){
+    $("symbolStatus").textContent="This browser blocked saving the invalid-symbol list.";
+    return false;
+  }
+}
+
+function populateSymbolCategories(){
+  const select=$("symbolCategory");
+  if(select.children.length) return;
+  const allOption=createMyArtElement("option","", "All categories");
+  allOption.value="";
+  select.appendChild(allOption);
+  SYMBOL_CATEGORIES.forEach(category=>{
+    const option=createMyArtElement("option","",category.name);
+    option.value=category.id;
+    select.appendChild(option);
+  });
+}
+
+function renderSymbolLibrary(){
+  populateSymbolCategories();
+  const container=$("symbolSections");
+  const query=$("symbolSearch").value.trim().toLocaleLowerCase();
+  const selectedCategory=$("symbolCategory").value;
+  const invalidOnly=$("symbolInvalidOnly").checked;
+  let visibleCount=0;
+  container.replaceChildren();
+
+  SYMBOL_CATEGORIES.forEach(category=>{
+    if(selectedCategory && selectedCategory!==category.id) return;
+    const matches=SYMBOL_LIBRARY.filter(item=>{
+      if(item.category.id!==category.id) return false;
+      if(invalidOnly && !invalidSymbols.has(item.symbol)) return false;
+      const hexadecimal=item.symbol.codePointAt(0).toString(16).toUpperCase();
+      const searchText=(item.symbol+" "+category.name+" "+category.keywords+" U+"+hexadecimal+" "+hexadecimal).toLocaleLowerCase();
+      return !query || searchText.includes(query);
+    });
+    if(!matches.length) return;
+
+    visibleCount += matches.length;
+    const section=createMyArtElement("section","symbol-section");
+    const heading=createMyArtElement("div","symbol-section-title");
+    heading.appendChild(createMyArtElement("strong","",category.name));
+    heading.appendChild(createMyArtElement("span","",String(matches.length)));
+    section.appendChild(heading);
+    const grid=createMyArtElement("div","symbol-grid");
+
+    matches.forEach(item=>{
+      const isInvalid=invalidSymbols.has(item.symbol);
+      const card=createMyArtElement("div","symbol-card"+(isInvalid ? " invalid":""));
+      const insertButton=createMyArtElement("button","symbol-glyph",item.symbol);
+      insertButton.type="button";
+      insertButton.title="Insert "+item.symbol+" at the cursor";
+      insertButton.setAttribute("aria-label","Insert symbol "+item.symbol);
+      insertButton.onclick=()=>insertLibrarySymbol(item.symbol);
+
+      const actions=createMyArtElement("div","symbol-card-actions");
+      const copyButton=createMyArtElement("button","secondary","Copy");
+      copyButton.type="button";
+      copyButton.onclick=()=>copyLibrarySymbol(item.symbol);
+      const invalidButton=createMyArtElement("button","secondary symbol-invalid-button"+(isInvalid ? " active":""),isInvalid ? "Restore":"Invalid");
+      invalidButton.type="button";
+      invalidButton.setAttribute("aria-pressed",isInvalid ? "true":"false");
+      invalidButton.onclick=()=>toggleInvalidSymbol(item.symbol);
+      actions.appendChild(copyButton);
+      actions.appendChild(invalidButton);
+      card.appendChild(insertButton);
+      card.appendChild(actions);
+      grid.appendChild(card);
+    });
+
+    section.appendChild(grid);
+    container.appendChild(section);
+  });
+
+  $("symbolCount").textContent=visibleCount+" of "+SYMBOL_LIBRARY.length+" symbols";
+  if(!visibleCount){
+    container.appendChild(createMyArtElement("div","symbol-empty","No symbols match this search."));
+  }
+}
+
+function insertLibrarySymbol(symbol){
+  const control=$("text");
+  const start=Math.min(control.selectionStart ?? control.value.length,control.selectionEnd ?? control.value.length);
+  const end=Math.max(control.selectionStart ?? control.value.length,control.selectionEnd ?? control.value.length);
+  control.value=control.value.slice(0,start)+symbol+control.value.slice(end);
+  handleTextChange();
+  const caret=start+symbol.length;
+  control.setSelectionRange(caret,caret);
+  setComposerView("preview");
+  control.focus();
+  $("symbolStatus").textContent="Inserted "+symbol+".";
+}
+
+async function copyLibrarySymbol(symbol){
+  const copied=await copyTextValue(symbol);
+  $("symbolStatus").textContent=copied ? "Copied "+symbol+".":"Clipboard access was blocked.";
+}
+
+function toggleInvalidSymbol(symbol){
+  const wasInvalid=invalidSymbols.has(symbol);
+  if(wasInvalid) invalidSymbols.delete(symbol);
+  else invalidSymbols.add(symbol);
+  persistInvalidSymbols();
+  renderSymbolLibrary();
+  render();
+  $("symbolStatus").textContent=wasInvalid ?
+    symbol+" restored as potentially valid.":
+    symbol+" marked invalid. It will appear as □ in the preview.";
+}
+
+function openSymbolLibrary(){
+  renderSymbolLibrary();
+  $("symbolModal").hidden=false;
+  document.body.classList.add("modal-open");
+  $("symbolSearch").focus();
+}
+
+function closeSymbolLibrary(){
+  $("symbolModal").hidden=true;
+  if($("myArtModal").hidden) document.body.classList.remove("modal-open");
+}
+
 async function copySavedArt(template){
   const copied=await copyTextValue(template.syntax);
   showMyArtStatus(copied ? `Copied “${template.name}”.`:"Clipboard access was blocked.",!copied);
@@ -1557,6 +1822,7 @@ document.addEventListener("pointerdown",()=>{
 document.addEventListener("keydown",event=>{
   if(event.key==="Escape" && openPicker) closeColorPicker();
   if(event.key==="Escape" && !$("myArtModal").hidden) closeMyArt();
+  if(event.key==="Escape" && !$("symbolModal").hidden) closeSymbolLibrary();
 });
 
 document.querySelectorAll(".composer-tab").forEach(tab=>{
@@ -1577,6 +1843,14 @@ $("myArtName").addEventListener("keydown",event=>{
 });
 $("myArtModal").addEventListener("pointerdown",event=>{
   if(event.target===$("myArtModal")) closeMyArt();
+});
+$("symbolsOpen").onclick=openSymbolLibrary;
+$("symbolsClose").onclick=closeSymbolLibrary;
+$("symbolSearch").addEventListener("input",renderSymbolLibrary);
+$("symbolCategory").addEventListener("change",renderSymbolLibrary);
+$("symbolInvalidOnly").addEventListener("change",renderSymbolLibrary);
+$("symbolModal").addEventListener("pointerdown",event=>{
+  if(event.target===$("symbolModal")) closeSymbolLibrary();
 });
 
 $("undoSolidColor").onclick=()=>{
@@ -1638,6 +1912,7 @@ if(donateToggle){
   };
 }
 
+loadInvalidSymbols();
 loadMyArtTemplates();
 renderMyArtList();
 importArtFromLocation();
