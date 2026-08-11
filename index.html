@@ -121,6 +121,7 @@
     <div id="solidBox" style="display:none;margin-top:12px">
       <label>Solid color</label>
       <div class="palette" id="palette"></div>
+      <div class="tiny" style="margin-top:8px">Solid mode adds one color code before the entire text.</div>
     </div>
 
     <div id="customBox" class="grid" style="display:none;margin-top:12px">
@@ -132,6 +133,24 @@
         <label>End code</label>
         <input id="endCode" maxlength="5" value="0000F">
       </div>
+    </div>
+
+    <div id="gradientDensity" style="margin-top:12px">
+      <label>Gradient code frequency</label>
+      <div class="grid">
+        <div>
+          <label for="stepSize">One color code every</label>
+          <input id="stepSize" type="number" inputmode="numeric" min="1" max="1000" step="1" value="1">
+        </div>
+        <div>
+          <label for="stepUnit">Group by</label>
+          <select id="stepUnit">
+            <option value="characters" selected>Character(s)</option>
+            <option value="words">Word(s)</option>
+          </select>
+        </div>
+      </div>
+      <div class="tiny" style="margin-top:6px">Choose 1 word for word-by-word color, or 2 words for one code per two-word group.</div>
     </div>
 
     <div style="height:12px"></div>
@@ -257,35 +276,78 @@ function approxCss(code){
   return `rgb(${r},${g},${b})`;
 }
 
-function getCodesForChars(chars){
+function getCodesForSegments(segments){
   const mode = $("mode").value;
-  if(mode==="solid") return chars.map(()=>selectedSolid);
-  if(mode==="rainbow") return interpolateStops(RAINBOW, chars.length);
-  if(mode==="redblack") return interpolateStops(REDBLACK, chars.length);
-  if(mode==="pinkwhite") return interpolateStops(PINKWHITE, chars.length);
+  if(mode==="solid") return segments.map(()=>selectedSolid);
+  if(mode==="rainbow") return interpolateStops(RAINBOW, segments.length);
+  if(mode==="redblack") return interpolateStops(REDBLACK, segments.length);
+  if(mode==="pinkwhite") return interpolateStops(PINKWHITE, segments.length);
   return interpolateStops(
     [$("startCode").value.toUpperCase(), $("endCode").value.toUpperCase()],
-    chars.length
+    segments.length
   );
+}
+
+function getStepSize(){
+  const value = parseInt($("stepSize").value,10);
+  return Number.isFinite(value) ? Math.max(1,Math.min(1000,value)) : 1;
+}
+
+function segmentByWords(text,wordsPerSegment){
+  const tokens = text.match(/\s+|\S+/gu) || [];
+  const segments=[];
+  let current="", wordCount=0;
+
+  tokens.forEach(token=>{
+    const isWhitespace = /^\s+$/u.test(token);
+    if(!isWhitespace && wordCount >= wordsPerSegment && current){
+      segments.push(current);
+      current="";
+      wordCount=0;
+    }
+    current += token;
+    if(!isWhitespace) wordCount++;
+  });
+
+  if(current) segments.push(current);
+  return segments;
+}
+
+function buildColorSegments(text){
+  if(!text) return [];
+  if($("mode").value==="solid") return [text];
+
+  const stepSize = getStepSize();
+  if($("stepUnit").value==="words") return segmentByWords(text,stepSize);
+
+  const chars = [...text];
+  const segments=[];
+  for(let i=0;i<chars.length;i+=stepSize){
+    segments.push(chars.slice(i,i+stepSize).join(""));
+  }
+  return segments;
 }
 
 function render(){
   const text = $("text").value;
-  const chars = [...text];
-  const codes = getCodesForChars(chars);
+  const segments = buildColorSegments(text);
+  const codes = getCodesForSegments(segments);
   const newlineEach = $("newlineEach").checked;
   const newlineSpaces = $("newlineSpaces").checked;
   const safeZeros = $("safeZeros").checked;
 
   let out="", preview="";
-  chars.forEach((ch,i)=>{
+  segments.forEach((segment,i)=>{
     let code = codes[i] || "FFFFF";
     if(safeZeros) code = code.replaceAll("0","1");
-    out += `<#${code}/>${ch}`;
-    const addBreak = (newlineEach && ch !== " ") || (newlineSpaces && ch === " ");
-    if(addBreak) out += "\\n";
-    preview += `<span style="color:${approxCss(code)}">${ch===" "?"&nbsp;":escapeHtml(ch)}</span>`;
-    if(addBreak) preview += "<br>";
+    out += `<#${code}/>`;
+    [...segment].forEach(ch=>{
+      out += ch;
+      const addBreak = (newlineEach && ch !== " ") || (newlineSpaces && ch === " ");
+      if(addBreak) out += "\\n";
+      preview += `<span style="color:${approxCss(code)}">${ch===" "?"&nbsp;":escapeHtml(ch)}</span>`;
+      if(addBreak) preview += "<br>";
+    });
   });
 
   $("output").value = out;
@@ -299,6 +361,7 @@ function escapeHtml(s){
 function updateModeUI(){
   $("solidBox").style.display = $("mode").value==="solid" ? "block":"none";
   $("customBox").style.display = $("mode").value==="custom" ? "grid":"none";
+  $("gradientDensity").style.display = $("mode").value==="solid" ? "none":"block";
   render();
 }
 
@@ -317,7 +380,7 @@ PALETTE.forEach(([name,code,css])=>{
   $("palette").appendChild(d);
 });
 
-["text","mode","startCode","endCode","newlineEach","newlineSpaces","safeZeros"].forEach(id=>{
+["text","mode","startCode","endCode","stepSize","stepUnit","newlineEach","newlineSpaces","safeZeros"].forEach(id=>{
   $(id).addEventListener("input", id==="mode" ? updateModeUI : render);
   $(id).addEventListener("change", id==="mode" ? updateModeUI : render);
 });
