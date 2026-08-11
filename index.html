@@ -1405,10 +1405,63 @@ solidSelectionSource=textControl.value;
   textControl.addEventListener(eventName,captureTextSelection);
 });
 
+function remapSolidSelections(oldText,newText){
+  if(!solidSelections.length || oldText===newText) return;
+
+  let prefix=0;
+  const sharedLength=Math.min(oldText.length,newText.length);
+  while(prefix<sharedLength && oldText[prefix]===newText[prefix]) prefix++;
+
+  let suffix=0;
+  while(
+    suffix<oldText.length-prefix && suffix<newText.length-prefix &&
+    oldText[oldText.length-1-suffix]===newText[newText.length-1-suffix]
+  ) suffix++;
+
+  const oldChangeEnd=oldText.length-suffix;
+  const newChangeEnd=newText.length-suffix;
+  const oldCodes=new Array(oldText.length);
+  solidSelections.forEach(selection=>{
+    const start=Math.max(0,Math.min(oldText.length,selection.start));
+    const end=Math.max(start,Math.min(oldText.length,selection.end));
+    for(let index=start;index<end;index++) oldCodes[index]=selection.code;
+  });
+
+  let inheritedCode;
+  if(prefix<oldChangeEnd && oldCodes[prefix]!==undefined){
+    inheritedCode=oldCodes[prefix];
+  }else if(prefix>0 && oldCodes[prefix-1]!==undefined){
+    inheritedCode=oldCodes[prefix-1];
+  }else if(oldChangeEnd<oldCodes.length && oldCodes[oldChangeEnd]!==undefined){
+    inheritedCode=oldCodes[oldChangeEnd];
+  }
+
+  const replacementLength=Math.max(0,newChangeEnd-prefix);
+  const newCodes=[
+    ...oldCodes.slice(0,prefix),
+    ...new Array(replacementLength).fill(inheritedCode),
+    ...oldCodes.slice(oldChangeEnd),
+  ];
+
+  const remapped=[];
+  let index=0;
+  while(index<newCodes.length){
+    const code=newCodes[index];
+    if(code===undefined){
+      index++;
+      continue;
+    }
+    const start=index;
+    while(index<newCodes.length && newCodes[index]===code) index++;
+    remapped.push({start,end:index,code});
+  }
+  solidSelections=remapped;
+}
+
 function handleTextChange(){
   if(solidSelectionSource!==textControl.value){
+    remapSolidSelections(solidSelectionSource,textControl.value);
     solidSelectionSource=textControl.value;
-    solidSelections=[];
     savedTextSelection=null;
     updateSelectionStatus();
   }
