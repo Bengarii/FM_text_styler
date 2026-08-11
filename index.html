@@ -56,6 +56,15 @@
   .note{font-size:12px;color:var(--muted);line-height:1.45}
   .warn{color:#ffd37a}
   .tiny{font-size:12px;color:var(--muted)}
+  .length-count{margin-top:7px}
+  .length-count.over{color:var(--danger);font-weight:800}
+  .copy-warning{
+    display:none; margin-top:10px; padding:11px 12px;
+    border:1px solid var(--danger); border-radius:10px; background:#2a1c22;
+    color:var(--text); font-size:13px; line-height:1.4;
+  }
+  .copy-warning.open{display:block}
+  .copy-warning strong{display:block;color:var(--danger);margin-bottom:3px}
   @media(max-width:520px){
     .grid{grid-template-columns:1fr}
     .palette{grid-template-columns:repeat(2,1fr)}
@@ -145,12 +154,12 @@
         <div>
           <label for="stepUnit">Group by</label>
           <select id="stepUnit">
-            <option value="characters" selected>Character(s)</option>
+            <option value="characters" selected>Non-space character(s)</option>
             <option value="words">Word(s)</option>
           </select>
         </div>
       </div>
-      <div class="tiny" style="margin-top:6px">Choose 1 word for word-by-word color, or 2 words for one code per two-word group.</div>
+      <div class="tiny" style="margin-top:6px">Choose 1 word for word-by-word color, or 2 words for one code per two-word group. Spaces do not count toward character groups.</div>
     </div>
 
     <div style="height:12px"></div>
@@ -179,11 +188,16 @@
   <div class="card">
     <label for="output">Copy/paste code</label>
     <textarea id="output" class="code" readonly></textarea>
+    <div id="lengthCount" class="tiny length-count"></div>
     <div class="grid" style="margin-top:10px">
       <button id="copyBtn">Copy code</button>
       <button class="secondary" id="selectBtn">Select code</button>
     </div>
     <div id="status" class="tiny" style="margin-top:8px"></div>
+    <div id="copyWarning" class="copy-warning" role="alert" aria-live="assertive">
+      <strong>WARNING: Message too long!</strong>
+      <div>Tip: Reduce the amount of colors, or increase character count per color to reduce message size.</div>
+    </div>
 
     <div class="donate-mobile">
       <button id="donateToggle" class="secondary">Hide donation option</button>
@@ -236,8 +250,10 @@ const PALETTE = [
 const RAINBOW = ["F0000","F0800","F0F00","08F00","00F00","00F0F","0000F","F111F"];
 const REDBLACK = ["F1111","D1111","B1111","91111","71111","51111","31111","11111"];
 const PINKWHITE = ["F111F","F333F","F555F","F777F","F999F","FBBBF","FDDDF","FFFFF"];
+const MAX_MESSAGE_LENGTH = 275;
 
 let selectedSolid = "F0000";
+let warnedOutput = "";
 const $ = id => document.getElementById(id);
 
 function hexDigit(c){ return parseInt(c,16); }
@@ -313,19 +329,55 @@ function segmentByWords(text,wordsPerSegment){
   return segments;
 }
 
+function segmentByCharacters(text,charactersPerSegment){
+  const segments=[];
+  let current="", characterCount=0;
+
+  [...text].forEach(ch=>{
+    const isWhitespace = /\s/u.test(ch);
+    if(!isWhitespace && characterCount >= charactersPerSegment && current){
+      segments.push(current);
+      current="";
+      characterCount=0;
+    }
+    current += ch;
+    if(!isWhitespace) characterCount++;
+  });
+
+  if(current) segments.push(current);
+  return segments;
+}
+
 function buildColorSegments(text){
   if(!text) return [];
   if($("mode").value==="solid") return [text];
 
   const stepSize = getStepSize();
   if($("stepUnit").value==="words") return segmentByWords(text,stepSize);
+  return segmentByCharacters(text,stepSize);
+}
 
-  const chars = [...text];
-  const segments=[];
-  for(let i=0;i<chars.length;i+=stepSize){
-    segments.push(chars.slice(i,i+stepSize).join(""));
-  }
-  return segments;
+function getMessageLength(value){
+  return [...value].length;
+}
+
+function resetCopyWarning(){
+  warnedOutput="";
+  $("copyWarning").classList.remove("open");
+  $("copyBtn").textContent="Copy code";
+  $("status").textContent="";
+}
+
+function showCopyWarning(value){
+  warnedOutput=value;
+  $("copyWarning").classList.add("open");
+  $("copyBtn").textContent="Copy anyway";
+}
+
+function updateLengthUI(value){
+  const total = getMessageLength(value);
+  $("lengthCount").textContent = `Total message length: ${total} / ${MAX_MESSAGE_LENGTH} (includes spaces and color syntax)`;
+  $("lengthCount").classList.toggle("over", total > MAX_MESSAGE_LENGTH);
 }
 
 function render(){
@@ -350,7 +402,10 @@ function render(){
     });
   });
 
+  const outputChanged = $("output").value !== out;
   $("output").value = out;
+  updateLengthUI(out);
+  if(outputChanged) resetCopyWarning();
   $("preview").innerHTML = preview || "&nbsp;";
 }
 
@@ -385,15 +440,32 @@ PALETTE.forEach(([name,code,css])=>{
   $(id).addEventListener("change", id==="mode" ? updateModeUI : render);
 });
 
-$("copyBtn").onclick=async()=>{
-  const out=$("output");
+async function copyOutput(out){
   try{
     await navigator.clipboard.writeText(out.value);
-    $("status").textContent="Copied.";
+    return true;
   }catch(e){
     out.focus(); out.select();
-    try{document.execCommand("copy"); $("status").textContent="Copied.";}
-    catch(_){$("status").textContent="Clipboard blocked by browser. Use Select code, then Copy.";}
+    try{return document.execCommand("copy");}
+    catch(_){return false;}
+  }
+}
+
+$("copyBtn").onclick=async()=>{
+  const out=$("output");
+  const tooLong = getMessageLength(out.value) > MAX_MESSAGE_LENGTH;
+  const firstWarning = tooLong && warnedOutput !== out.value;
+  if(firstWarning) showCopyWarning(out.value);
+
+  const copied = await copyOutput(out);
+  if(!copied){
+    $("status").textContent="Clipboard blocked by browser. Use Select code, then Copy.";
+  }else if(firstWarning){
+    $("status").textContent="Copied. Please review the length warning below.";
+  }else if(tooLong){
+    $("status").textContent="Copied anyway.";
+  }else{
+    $("status").textContent="Copied.";
   }
 };
 
