@@ -45,12 +45,16 @@
   .mode-button.active,.segment-button.active{background:var(--accent);color:#001522}
   .mode-controls{margin-top:10px;padding-top:11px;border-top:1px solid var(--border)}
   .solid-help{margin:0 auto 9px;max-width:500px;line-height:1.4;text-align:center}
+  .pattern-option{width:max-content;margin:7px auto 10px;padding:6px 9px}
+  .pattern-controls{margin-top:4px}
   .solid-unit-row{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;margin:0 auto 12px}
   .solid-unit-row>span{font-size:12px;color:var(--muted)}
   .solid-unit-row .segment-buttons{width:116px;padding:2px;gap:2px;border-radius:8px}
   .solid-unit-row .segment-button{padding:5px 6px;font-size:10px}
   .solid-actions{display:flex;justify-content:center;gap:5px;flex-wrap:wrap;margin:13px 0 6px}
   .solid-actions button{width:auto;padding:6px 8px;font-size:10px}
+  .selection-actions{display:flex;justify-content:center;margin:8px 0 5px}
+  .selection-actions button{width:auto;padding:6px 8px;font-size:10px}
   .pattern-sequence{
     display:grid;grid-template-columns:repeat(var(--pattern-columns,1),20px);gap:5px;
     justify-content:start;width:max-content;max-width:245px;min-height:20px;margin:6px auto 9px;
@@ -70,6 +74,7 @@
     border:2px solid transparent;padding:0;cursor:pointer;overflow:hidden;
   }
   .color-swatch.in-pattern{border-color:#fff;box-shadow:0 0 0 1px var(--accent)}
+  .color-swatch.selected{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
   .order-badge{
     display:none;position:absolute;right:3px;bottom:2px;max-width:calc(100% - 6px);
     padding:0 3px;border-radius:999px;background:#080a0f;color:#fff;
@@ -123,13 +128,14 @@
   }
   .editor-input.preview-editing{
     background:transparent;color:transparent;caret-color:#fff;
-    -webkit-text-fill-color:transparent;
+    -webkit-text-fill-color:transparent;font-weight:800;
   }
   .editor-preview{
     position:absolute;z-index:1;inset:0;overflow:hidden;pointer-events:none;
     padding:12px 12px 48px;border:1px solid var(--border);border-radius:10px;background:#4a5368;
     font-size:18px;font-weight:800;line-height:1.45;white-space:pre-wrap;word-break:break-word;
   }
+  .editor-preview.generated-newlines{line-height:1.05}
   .syntax-input{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;background:var(--panel2)}
   .editor-toolbar{
     position:absolute;z-index:4;left:8px;right:8px;bottom:8px;
@@ -223,33 +229,39 @@
       </div>
     </div>
 
+    <div id="lengthCount" class="tiny length-count"></div>
+
     <div id="rainbowOption" class="inline-check rainbow-row">
       <input type="checkbox" id="rainbowMode">
       <label for="rainbowMode">Rainbow mode</label>
     </div>
     <div id="rainbowFrequencySlot" class="frequency-slot"></div>
 
-    <div id="lengthCount" class="tiny length-count"></div>
-
     <div id="modeControls" class="mode-controls">
       <div id="solidControls">
-        <div class="tiny solid-help">Tap colors to build a repeating order, or highlight part of the message and tap a color to apply it only there.</div>
+        <div class="tiny solid-help">Tap a color for the whole message, or highlight part of the message and tap a color to apply it only there. Turn on Pattern mode to build a repeating order.</div>
 
-        <div class="solid-unit-row">
-          <span>Repeat order by</span>
-          <div class="segment-buttons" role="group" aria-label="Repeat solid colors by">
-            <button type="button" class="segment-button active" data-solid-unit="words" aria-pressed="true">Word</button>
-            <button type="button" class="segment-button" data-solid-unit="characters" aria-pressed="false">Char</button>
+        <div class="inline-check pattern-option">
+          <input type="checkbox" id="patternMode">
+          <label for="patternMode">Pattern mode</label>
+        </div>
+
+        <div id="patternControls" class="pattern-controls" hidden>
+          <div class="solid-unit-row">
+            <span>Repeat order by</span>
+            <div class="segment-buttons" role="group" aria-label="Repeat solid colors by">
+              <button type="button" class="segment-button active" data-solid-unit="words" aria-pressed="true">Word</button>
+              <button type="button" class="segment-button" data-solid-unit="characters" aria-pressed="false">Char</button>
+            </div>
+            <input id="solidUnit" type="hidden" value="words">
           </div>
-          <input id="solidUnit" type="hidden" value="words">
-        </div>
 
-        <div id="solidActions" class="solid-actions" hidden>
-          <button id="undoSolidColor" type="button" class="secondary">Undo</button>
-          <button id="clearSolidPattern" type="button" class="secondary">Clear order</button>
-          <button id="clearSolidSelections" type="button" class="secondary">Clear text selections</button>
+          <div id="solidActions" class="solid-actions" hidden>
+            <button id="undoSolidColor" type="button" class="secondary">Undo</button>
+            <button id="clearSolidPattern" type="button" class="secondary">Clear order</button>
+          </div>
+          <div id="solidPattern" class="pattern-sequence" aria-label="Chosen color order"></div>
         </div>
-        <div id="solidPattern" class="pattern-sequence" aria-label="Chosen color order"></div>
 
         <div class="solid-palette-wrap">
           <div class="color-grid" id="palette" aria-label="Quick-pick solid colors"></div>
@@ -258,6 +270,9 @@
             <div class="experimental-note">These colors may not work in-game.</div>
             <div class="color-grid experimental-palette" id="experimentalSolidPalette"></div>
           </details>
+        </div>
+        <div id="selectionActions" class="selection-actions" hidden>
+          <button id="clearSolidSelections" type="button" class="secondary">Clear text selections</button>
         </div>
         <div id="selectionStatus" class="tiny selection-status" aria-live="polite"></div>
       </div>
@@ -330,10 +345,10 @@
   </div>
 
   <div class="card donate-bottom">
-    <div class="donate-title">Optional tip</div>
-    <div class="donate-copy">The formatter is free. If it saved you time, you can optionally support it here.</div>
-    <button id="donateToggle" type="button" class="secondary">Show donation option</button>
-    <div id="donatePanel" class="donate-panel">
+    <div class="donate-title">Buy me some gems?</div>
+    <div class="donate-copy">The formatter is free. If you like it and wish to support me, or perhaps help me out with some Forge Master gems - you can do that here! ❤️</div>
+    <button id="donateToggle" type="button" class="secondary">Hide donation option</button>
+    <div id="donatePanel" class="donate-panel open">
       <iframe id="kofiframe"
         src="https://ko-fi.com/bengarii/?hidefeed=true&widget=true&embed=true&preview=true"
         class="donate-frame"
@@ -381,6 +396,7 @@ EXPERIMENTAL_LEVELS.forEach(r=>{
 const RAINBOW = ["F0000","F0800","F0F00","08F00","00F00","00F0F","0000F","F111F"];
 const MAX_MESSAGE_LENGTH = 275;
 
+let solidColor = null;
 let solidPattern = [];
 let solidSelections = [];
 let savedTextSelection = null;
@@ -493,10 +509,22 @@ function getPaletteCss(code){
 }
 
 function renderSolidPattern(){
+  const patternEnabled=$("patternMode").checked;
+  $("patternControls").hidden=!patternEnabled;
+
+  if(!patternEnabled){
+    $("solidPattern").innerHTML="";
+    $("solidActions").hidden=true;
+    syncPaletteSelection("solid",solidColor);
+    updateSolidOrderBadges();
+    return;
+  }
+
+  clearPaletteSelection("solid");
   if(!solidPattern.length){
     $("solidPattern").innerHTML="";
     $("solidPattern").style.setProperty("--pattern-columns",1);
-    $("solidActions").hidden=solidSelections.length===0;
+    $("solidActions").hidden=true;
     updateSolidOrderBadges();
     return;
   }
@@ -513,11 +541,13 @@ function renderSolidPattern(){
 
 function updateSolidOrderBadges(){
   const positions=new Map();
-  solidPattern.forEach((code,index)=>{
-    const key=code===null ? "":code;
-    if(!positions.has(key)) positions.set(key,[]);
-    positions.get(key).push(index+1);
-  });
+  if($("patternMode").checked){
+    solidPattern.forEach((code,index)=>{
+      const key=code===null ? "":code;
+      if(!positions.has(key)) positions.set(key,[]);
+      positions.get(key).push(index+1);
+    });
+  }
 
   ["palette","experimentalSolidPalette"].forEach(containerId=>{
     document.querySelectorAll(`#${containerId} .color-swatch`).forEach(swatch=>{
@@ -530,6 +560,7 @@ function updateSolidOrderBadges(){
 
 function updateSelectionStatus(){
   const currentText=$("text").value;
+  $("selectionActions").hidden=solidSelections.length===0;
   if(savedTextSelection && savedTextSelection.text===currentText && savedTextSelection.start<savedTextSelection.end){
     const selected=currentText.slice(savedTextSelection.start,savedTextSelection.end).replace(/\s+/g," ").trim();
     const shortSelected=selected.length>36 ? `${selected.slice(0,33)}…`:selected;
@@ -561,11 +592,12 @@ function handleSolidColorChoice(code){
       code,
     });
     savedTextSelection=null;
-  }else{
+  }else if($("patternMode").checked){
     solidPattern.push(code);
+  }else{
+    solidColor=code;
   }
   renderSolidPattern();
-  $("solidActions").hidden=solidPattern.length===0 && solidSelections.length===0;
   updateSelectionStatus();
 }
 
@@ -580,11 +612,12 @@ function buildSolidRuns(text){
   });
 
   const repeatByWord=$("solidUnit").value==="words";
+  const patternEnabled=$("patternMode").checked;
   let patternIndex=0, lastCode=null, inWord=false;
 
   entries.forEach(entry=>{
     const isWhitespace=/\s/u.test(entry.ch);
-    if(solidPattern.length){
+    if(patternEnabled && solidPattern.length){
       if(repeatByWord){
         if(!isWhitespace && !inWord){
           lastCode=solidPattern[patternIndex % solidPattern.length];
@@ -601,6 +634,8 @@ function buildSolidRuns(text){
         }
         entry.code=lastCode;
       }
+    }else if(!patternEnabled){
+      entry.code=solidColor;
     }
 
     solidSelections.forEach(selection=>{
@@ -656,6 +691,7 @@ function render(){
   }
   const newlineEach = $("newlineEach").checked;
   const newlineSpaces = $("newlineSpaces").checked;
+  $("preview").classList.toggle("generated-newlines",newlineEach || newlineSpaces);
 
   let out="", preview="", hasActiveColor=false;
   runs.forEach(run=>{
@@ -913,6 +949,14 @@ document.querySelectorAll("[data-newline-toggle]").forEach(button=>{
 });
 
 $("rainbowMode").addEventListener("change",updateModeUI);
+
+$("patternMode").addEventListener("change",()=>{
+  if($("patternMode").checked && !solidPattern.length && solidColor!==null){
+    solidPattern.push(solidColor);
+  }
+  renderSolidPattern();
+  render();
+});
 
 ["start","end"].forEach(kind=>{
   $(kind+"ColorTrigger").onclick=event=>{
