@@ -37,52 +37,79 @@
     font-weight:800; cursor:pointer;
   }
   button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .row{display:flex;gap:10px;align-items:center}
-  .row input[type=checkbox]{width:auto;transform:scale(1.2)}
-  .row label{margin:0;color:var(--text)}
-  .palette{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-  .compact-palette{grid-template-columns:repeat(3,1fr);margin-top:8px}
-  .compact-palette .swatch{min-height:40px;padding:4px;font-size:10px}
-  .experimental-colors{
-    margin-top:10px; padding:8px; border:1px solid var(--border);
-    border-radius:10px; background:var(--panel2);
+  .mode-switch{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;margin-bottom:12px}
+  .mode-label{font-size:13px;color:var(--muted);font-weight:800}
+  .mode-buttons,.segment-buttons{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border:1px solid var(--border);border-radius:11px;background:var(--panel2)}
+  .mode-button,.segment-button{padding:8px;background:transparent;color:var(--text);border:0;border-radius:7px}
+  .mode-button.active,.segment-button.active{background:var(--accent);color:#001522}
+  .mode-controls{margin-top:10px;padding-top:11px;border-top:1px solid var(--border)}
+  .solid-help{margin:0 auto 9px;max-width:500px;line-height:1.4;text-align:center}
+  .solid-unit-row{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 auto 8px}
+  .solid-unit-row>span{font-size:12px;color:var(--muted)}
+  .solid-unit-row .segment-buttons{width:160px}
+  .solid-actions{display:flex;justify-content:center;gap:5px;flex-wrap:wrap;margin:6px 0}
+  .solid-actions button{width:auto;padding:6px 8px;font-size:10px}
+  .pattern-sequence{
+    display:grid;grid-template-columns:repeat(var(--pattern-columns,1),20px);gap:5px;
+    justify-content:start;width:max-content;max-width:245px;min-height:20px;margin:6px auto 9px;
   }
-  .experimental-colors summary{cursor:pointer;font-size:12px;font-weight:800}
-  .experimental-note{margin:7px 0;color:#ffd37a}
-  .experimental-palette{
-    grid-template-columns:repeat(auto-fill,minmax(52px,1fr));
-    gap:5px; max-height:220px; overflow:auto; padding:3px;
+  .pattern-sequence:empty{display:none}
+  .pattern-dot{width:20px;height:20px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px var(--border)}
+  .pattern-dot.no-color,.no-color-swatch{background:#d7dbe3!important}
+  .pattern-dot.no-color{position:relative;overflow:hidden}
+  .pattern-dot.no-color::after,.no-color-swatch::after{
+    content:"";position:absolute;left:8%;right:8%;top:50%;height:2px;background:#e32636;
+    transform:rotate(-45deg);transform-origin:center;box-shadow:0 0 0 1px rgba(255,255,255,.35);
   }
-  .experimental-palette .swatch{min-height:34px;padding:4px;font-size:10px}
-  .swatch{
-    position:relative;
-    min-height:44px;border-radius:9px;border:2px solid transparent;padding:6px;
-    display:flex;align-items:center;justify-content:center;
-    font-size:12px;font-weight:800;cursor:pointer;color:#fff;text-shadow:0 1px 2px #000;
+  .solid-palette-wrap{max-width:500px;margin:0 auto}
+  .color-grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px}
+  .color-swatch{
+    position:relative;width:100%;min-width:0;aspect-ratio:1;border-radius:6px;
+    border:2px solid transparent;padding:0;cursor:pointer;overflow:hidden;
   }
-  .swatch.selected{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
+  .color-swatch.in-pattern{border-color:#fff;box-shadow:0 0 0 1px var(--accent)}
   .order-badge{
     display:none;position:absolute;right:3px;bottom:2px;max-width:calc(100% - 6px);
-    padding:1px 4px;border-radius:999px;background:#080a0f;color:#fff;
-    font-size:9px;line-height:1.35;text-shadow:none;white-space:nowrap;overflow:hidden;
+    padding:0 3px;border-radius:999px;background:#080a0f;color:#fff;
+    font-size:8px;line-height:1.35;text-shadow:none;white-space:nowrap;overflow:hidden;
   }
-  .swatch.in-pattern .order-badge{display:block}
-  .no-color-swatch{
-    background:repeating-linear-gradient(135deg,#fff 0 8px,#c8ceda 8px 16px)!important;
-    color:#111!important;text-shadow:none;
+  .color-swatch.in-pattern .order-badge{display:block}
+  .experimental-colors{margin-top:7px;padding:7px;border:1px solid var(--border);border-radius:9px;background:var(--panel2)}
+  .experimental-colors summary{cursor:pointer;font-size:11px;font-weight:800}
+  .experimental-note{margin:6px 0;color:#ffd37a;font-size:10px}
+  .experimental-palette{max-height:190px;overflow:auto;padding:3px}
+  .selection-status{min-height:0;margin:7px auto 0;max-width:500px;line-height:1.35;text-align:center}
+  .gradient-controls{position:relative;max-width:500px;margin:0 auto}
+  .gradient-endpoints{display:flex;align-items:center;justify-content:center;gap:15px;margin:2px 0 10px}
+  .endpoint{display:flex;align-items:center;gap:7px}
+  .endpoint-label{font-size:11px;color:var(--muted)}
+  .endpoint-trigger{
+    width:34px;height:34px;flex:0 0 34px;padding:0;border:2px solid #fff;border-radius:50%;
+    box-shadow:0 0 0 2px var(--accent);
   }
-  .solid-help{
-    margin-bottom:10px;padding:9px 10px;border-radius:9px;
-    background:var(--panel2);line-height:1.45;
+  .gradient-arrow{color:var(--muted);font-weight:900}
+  .picker-popover{
+    position:absolute;z-index:20;top:44px;left:50%;transform:translateX(-50%);
+    width:min(340px,calc(100vw - 64px));padding:10px;border:1px solid #566077;
+    border-radius:12px;background:#171b23;box-shadow:0 12px 35px rgba(0,0,0,.55);
   }
-  .solid-pattern-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 12px}
-  .pattern-sequence{min-height:28px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;flex:1}
-  .pattern-dot{width:24px;height:24px;flex:0 0 24px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px var(--border)}
-  .pattern-dot.no-color{background:repeating-linear-gradient(135deg,#fff 0 5px,#c8ceda 5px 10px)}
-  .pattern-actions{display:flex;gap:5px;flex-wrap:wrap}
-  .pattern-actions button{width:auto;padding:7px 9px;font-size:11px}
-  .selection-status{margin:10px 0;line-height:1.45}
+  .picker-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .picker-title-row strong{font-size:12px}
+  .picker-close{width:auto;padding:5px 8px;font-size:11px}
+  .picker-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:5px}
+  .picker-grid.experimental-palette{grid-template-columns:repeat(10,minmax(0,1fr))}
+  .picker-swatch{width:100%;aspect-ratio:1;padding:0;border:2px solid transparent;border-radius:50%}
+  .picker-swatch.selected{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
+  .custom-code-row{display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px}
+  .custom-code-row input{min-width:0;padding:8px 9px;text-transform:uppercase;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+  .custom-code-row button{width:auto;padding:8px 11px}
+  .picker-error{min-height:14px;margin-top:4px;color:var(--danger);font-size:10px}
+  .frequency-slot{grid-column:1/-1}
+  .frequency-slot:empty{display:none}
+  .frequency-line{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:nowrap;margin-top:8px}
+  .frequency-number{width:62px;padding:8px 9px;text-align:center}
+  .frequency-line>span{font-size:12px;color:var(--muted);white-space:nowrap}
+  .frequency-line .segment-buttons{width:130px;flex:0 0 130px}
   .composer-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px}
   .composer-tab{padding:9px;background:var(--panel2);color:var(--text);border:1px solid var(--border)}
   .composer-tab.active{background:var(--accent);color:#001522;border-color:transparent}
@@ -105,6 +132,7 @@
   .inline-check{display:flex;gap:8px;align-items:center;padding:8px 9px;border:1px solid var(--border);border-radius:9px;background:var(--panel2)}
   .inline-check input{width:auto;transform:scale(1.15)}
   .inline-check label{margin:0;color:var(--text);font-size:12px}
+  .rainbow-row{grid-column:1/-1}
   .copy-row{margin-top:10px}
   [hidden]{display:none!important}
   .note{font-size:12px;color:var(--muted);line-height:1.45}
@@ -120,9 +148,16 @@
   .copy-warning.open{display:block}
   .copy-warning strong{display:block;color:var(--danger);margin-bottom:3px}
   @media(max-width:520px){
-    .grid{grid-template-columns:1fr}
-    .palette{grid-template-columns:repeat(2,1fr)}
     .composer-options{grid-template-columns:1fr}
+    .rainbow-row,.frequency-slot{grid-column:1}
+    .mode-switch{grid-template-columns:1fr;gap:6px}
+    .solid-help{font-size:11px}
+    .color-grid{gap:4px}
+    .order-badge{right:1px;bottom:1px;padding:0 2px;font-size:7px}
+    .gradient-endpoints{gap:9px}
+    .endpoint{gap:5px}
+    .frequency-line{gap:5px}
+    .frequency-line .segment-buttons{width:116px;flex-basis:116px}
   }
 
   .topbar{display:block}
@@ -148,7 +183,16 @@
     </div>
   </header>
 
-  <div class="card">
+  <div class="card" id="composerCard">
+    <div class="mode-switch">
+      <span class="mode-label">Mode</span>
+      <div class="mode-buttons" role="group" aria-label="Color mode">
+        <button type="button" class="mode-button active" data-mode="solid" aria-pressed="true">Solid Color</button>
+        <button type="button" class="mode-button" data-mode="gradient" aria-pressed="false">Gradient</button>
+      </div>
+      <input id="mode" type="hidden" value="solid">
+    </div>
+
     <div class="composer-tabs" role="tablist" aria-label="Message view">
       <button type="button" class="composer-tab active" data-view="preview" role="tab" aria-selected="true">Preview</button>
       <button type="button" class="composer-tab" data-view="raw" role="tab" aria-selected="false">Raw Text</button>
@@ -170,99 +214,110 @@
         <input type="checkbox" id="newlineSpaces">
         <label for="newlineSpaces">Newline after space</label>
       </div>
+      <div id="rainbowOption" class="inline-check rainbow-row">
+        <input type="checkbox" id="rainbowMode">
+        <label for="rainbowMode">Rainbow mode</label>
+      </div>
+      <div id="rainbowFrequencySlot" class="frequency-slot"></div>
+    </div>
+
+    <div id="lengthCount" class="tiny length-count"></div>
+
+    <div id="modeControls" class="mode-controls">
+      <div id="solidControls">
+        <div class="tiny solid-help">Tap colors to build a repeating order, or highlight part of the message and tap a color to apply it only there.</div>
+
+        <div class="solid-unit-row">
+          <span>Repeat order by</span>
+          <div class="segment-buttons" role="group" aria-label="Repeat solid colors by">
+            <button type="button" class="segment-button active" data-solid-unit="words" aria-pressed="true">Word</button>
+            <button type="button" class="segment-button" data-solid-unit="characters" aria-pressed="false">Char</button>
+          </div>
+          <input id="solidUnit" type="hidden" value="words">
+        </div>
+
+        <div id="solidActions" class="solid-actions" hidden>
+          <button id="undoSolidColor" type="button" class="secondary">Undo</button>
+          <button id="clearSolidPattern" type="button" class="secondary">Clear order</button>
+          <button id="clearSolidSelections" type="button" class="secondary">Clear text selections</button>
+        </div>
+        <div id="solidPattern" class="pattern-sequence" aria-label="Chosen color order"></div>
+
+        <div class="solid-palette-wrap">
+          <div class="color-grid" id="palette" aria-label="Quick-pick solid colors"></div>
+          <details class="experimental-colors">
+            <summary>Experimental colors</summary>
+            <div class="experimental-note">These colors may not work in-game.</div>
+            <div class="color-grid experimental-palette" id="experimentalSolidPalette"></div>
+          </details>
+        </div>
+        <div id="selectionStatus" class="tiny selection-status" aria-live="polite"></div>
+      </div>
+
+      <div id="gradientControls" class="gradient-controls" hidden>
+        <div class="gradient-endpoints" aria-label="Gradient colors">
+          <div class="endpoint">
+            <span class="endpoint-label">Start</span>
+            <button id="startColorTrigger" type="button" class="endpoint-trigger" aria-haspopup="dialog" aria-expanded="false" aria-label="Choose start color"></button>
+          </div>
+          <span class="gradient-arrow" aria-hidden="true">→</span>
+          <div class="endpoint">
+            <span class="endpoint-label">End</span>
+            <button id="endColorTrigger" type="button" class="endpoint-trigger" aria-haspopup="dialog" aria-expanded="false" aria-label="Choose end color"></button>
+          </div>
+        </div>
+
+        <div id="startPicker" class="picker-popover" role="dialog" aria-label="Choose start color" hidden>
+          <div class="picker-title-row"><strong>Start color</strong><button type="button" class="secondary picker-close" data-close-picker="start">Close</button></div>
+          <div class="picker-grid" id="startPalette"></div>
+          <details class="experimental-colors">
+            <summary>Experimental colors</summary>
+            <div class="experimental-note">These colors may not work in-game.</div>
+            <div class="picker-grid experimental-palette" id="experimentalStartPalette"></div>
+          </details>
+          <div class="custom-code-row">
+            <input id="startCode" maxlength="5" inputmode="text" value="F0000" aria-label="Custom start color code">
+            <button id="applyStartCode" type="button">Apply</button>
+          </div>
+          <div id="startCodeError" class="picker-error" aria-live="polite"></div>
+        </div>
+
+        <div id="endPicker" class="picker-popover" role="dialog" aria-label="Choose end color" hidden>
+          <div class="picker-title-row"><strong>End color</strong><button type="button" class="secondary picker-close" data-close-picker="end">Close</button></div>
+          <div class="picker-grid" id="endPalette"></div>
+          <details class="experimental-colors">
+            <summary>Experimental colors</summary>
+            <div class="experimental-note">These colors may not work in-game.</div>
+            <div class="picker-grid experimental-palette" id="experimentalEndPalette"></div>
+          </details>
+          <div class="custom-code-row">
+            <input id="endCode" maxlength="5" inputmode="text" value="11111" aria-label="Custom end color code">
+            <button id="applyEndCode" type="button">Apply</button>
+          </div>
+          <div id="endCodeError" class="picker-error" aria-live="polite"></div>
+        </div>
+
+        <div id="gradientFrequencySlot" class="frequency-slot">
+          <div id="frequencyLine" class="frequency-line">
+            <input id="stepSize" class="frequency-number" type="number" inputmode="numeric" min="1" max="1000" step="1" value="1" aria-label="Colors per group">
+            <span>color every</span>
+            <div class="segment-buttons" role="group" aria-label="Gradient group">
+              <button type="button" class="segment-button active" data-step-unit="characters" aria-pressed="true">Char</button>
+              <button type="button" class="segment-button" data-step-unit="words" aria-pressed="false">Word</button>
+            </div>
+            <input id="stepUnit" type="hidden" value="characters">
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="copy-row">
       <button id="copyBtn">Copy code</button>
     </div>
-    <div id="lengthCount" class="tiny length-count"></div>
     <div id="status" class="tiny" style="margin-top:8px"></div>
     <div id="copyWarning" class="copy-warning" role="alert" aria-live="assertive">
       <strong>WARNING: Message too long!</strong>
       <div>Tip: Reduce the amount of colors, or increase character count per color to reduce message size.</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <label>Mode</label>
-    <select id="mode">
-      <option value="solid">Solid colors / repeating pattern</option>
-      <option value="rainbow" selected>Rainbow</option>
-      <option value="custom">Custom start → end (5-digit codes)</option>
-    </select>
-
-    <div id="solidBox" style="display:none;margin-top:12px">
-      <div class="tiny solid-help">
-        Tap colors with no text selected to build a repeating order. To color only part of the message, highlight words or characters in the editor above, then tap a color.
-      </div>
-
-      <label for="solidUnit">Repeat the chosen order by</label>
-      <select id="solidUnit">
-        <option value="words" selected>Word</option>
-        <option value="characters">Non-space character</option>
-      </select>
-
-      <label style="margin-top:10px">Chosen color order</label>
-      <div class="solid-pattern-row">
-        <div id="solidPattern" class="pattern-sequence"></div>
-        <div class="pattern-actions">
-          <button id="undoSolidColor" type="button" class="secondary">Undo</button>
-          <button id="clearSolidPattern" type="button" class="secondary">Clear order</button>
-          <button id="clearSolidSelections" type="button" class="secondary">Clear text selections</button>
-        </div>
-      </div>
-
-      <label>Quick-pick solid colors</label>
-      <div class="palette" id="palette"></div>
-      <details class="experimental-colors">
-        <summary>Experimental colors</summary>
-        <div class="tiny experimental-note">These colors use valid five-digit codes, but they may not work in-game.</div>
-        <div class="palette experimental-palette" id="experimentalSolidPalette"></div>
-      </details>
-      <div id="selectionStatus" class="tiny selection-status">No text selection captured. Highlight text above, then tap a color.</div>
-    </div>
-
-    <div id="customBox" class="grid" style="display:none;margin-top:12px">
-      <div>
-        <label>Start code</label>
-        <input id="startCode" maxlength="5" value="F0000">
-        <label style="margin-top:9px">Quick-pick start colors</label>
-        <div class="palette compact-palette" id="startPalette"></div>
-        <details class="experimental-colors">
-          <summary>Experimental colors</summary>
-          <div class="tiny experimental-note">These colors use valid five-digit codes, but they may not work in-game.</div>
-          <div class="palette experimental-palette" id="experimentalStartPalette"></div>
-        </details>
-      </div>
-      <div>
-        <label>End code</label>
-        <input id="endCode" maxlength="5" value="0000F">
-        <label style="margin-top:9px">Quick-pick end colors</label>
-        <div class="palette compact-palette" id="endPalette"></div>
-        <details class="experimental-colors">
-          <summary>Experimental colors</summary>
-          <div class="tiny experimental-note">These colors use valid five-digit codes, but they may not work in-game.</div>
-          <div class="palette experimental-palette" id="experimentalEndPalette"></div>
-        </details>
-      </div>
-    </div>
-
-    <div id="gradientDensity" style="margin-top:12px">
-      <label>Gradient code frequency</label>
-      <div class="grid">
-        <div>
-          <label for="stepSize">One color code every</label>
-          <input id="stepSize" type="number" inputmode="numeric" min="1" max="1000" step="1" value="1">
-        </div>
-        <div>
-          <label for="stepUnit">Group by</label>
-          <select id="stepUnit">
-            <option value="characters" selected>Non-space character(s)</option>
-            <option value="words">Word(s)</option>
-          </select>
-        </div>
-      </div>
-      <div class="tiny" style="margin-top:6px">Choose 1 word for word-by-word color, or 2 words for one code per two-word group. Spaces do not count toward character groups.</div>
     </div>
   </div>
 
@@ -324,6 +379,7 @@ let savedTextSelection = null;
 let solidSelectionSource = "";
 let warnedOutput = "";
 let activeComposerView = "preview";
+let openPicker = null;
 const $ = id => document.getElementById(id);
 
 function hexDigit(c){ return parseInt(c,16); }
@@ -364,7 +420,7 @@ function approxCss(code){
 
 function getCodesForSegments(segments){
   const mode = $("mode").value;
-  if(mode==="rainbow") return interpolateStops(RAINBOW, segments.length);
+  if(mode==="solid" && $("rainbowMode").checked) return interpolateStops(RAINBOW, segments.length);
   return interpolateStops(
     [$("startCode").value.toUpperCase(), $("endCode").value.toUpperCase()],
     segments.length
@@ -425,21 +481,25 @@ function buildColorSegments(text){
 
 function getPaletteCss(code){
   const item = PALETTE.find(color=>color[1]===code) || EXPERIMENTAL_PALETTE.find(color=>color[1]===code);
-  return item ? item[2] : "#ffffff";
+  return item ? item[2] : approxCss(code);
 }
 
 function renderSolidPattern(){
   if(!solidPattern.length){
-    $("solidPattern").innerHTML='<span class="tiny">None yet</span>';
+    $("solidPattern").innerHTML="";
+    $("solidPattern").style.setProperty("--pattern-columns",1);
+    $("solidActions").hidden=solidSelections.length===0;
     updateSolidOrderBadges();
     return;
   }
 
+  $("solidPattern").style.setProperty("--pattern-columns",Math.min(10,solidPattern.length));
   $("solidPattern").innerHTML=solidPattern.map((code,index)=>{
     if(code===null) return `<span class="pattern-dot no-color" title="${index+1}. No color"></span>`;
     const css=getPaletteCss(code);
     return `<span class="pattern-dot" style="background:${css}" title="${index+1}. ${code}"></span>`;
   }).join("");
+  $("solidActions").hidden=false;
   updateSolidOrderBadges();
 }
 
@@ -452,7 +512,7 @@ function updateSolidOrderBadges(){
   });
 
   ["palette","experimentalSolidPalette"].forEach(containerId=>{
-    document.querySelectorAll(`#${containerId} .swatch`).forEach(swatch=>{
+    document.querySelectorAll(`#${containerId} .color-swatch`).forEach(swatch=>{
       const order=positions.get(swatch.dataset.code) || [];
       swatch.classList.toggle("in-pattern",order.length>0);
       if(swatch._orderBadge) swatch._orderBadge.textContent=order.join(",");
@@ -469,7 +529,7 @@ function updateSelectionStatus(){
   }else if(solidSelections.length){
     $("selectionStatus").textContent=`${solidSelections.length} selection override(s) applied. Highlight more text above, then tap another color.`;
   }else{
-    $("selectionStatus").textContent="No text selection captured. Highlight text above, then tap a color.";
+    $("selectionStatus").textContent="";
   }
 }
 
@@ -497,6 +557,7 @@ function handleSolidColorChoice(code){
     solidPattern.push(code);
   }
   renderSolidPattern();
+  $("solidActions").hidden=solidPattern.length===0 && solidSelections.length===0;
   updateSelectionStatus();
 }
 
@@ -578,7 +639,7 @@ function render(){
   const text = $("text").value;
   const mode = $("mode").value;
   let runs;
-  if(mode==="solid"){
+  if(mode==="solid" && !$("rainbowMode").checked){
     runs=buildSolidRuns(text);
   }else{
     const segments=buildColorSegments(text);
@@ -634,9 +695,29 @@ function escapeHtml(s){
 }
 
 function updateModeUI(){
-  $("solidBox").style.display = $("mode").value==="solid" ? "block":"none";
-  $("customBox").style.display = $("mode").value==="custom" ? "grid":"none";
-  $("gradientDensity").style.display = $("mode").value==="solid" ? "none":"block";
+  const mode=$("mode").value;
+  const rainbow=mode==="solid" && $("rainbowMode").checked;
+
+  document.querySelectorAll(".mode-button").forEach(button=>{
+    const active=button.dataset.mode===mode;
+    button.classList.toggle("active",active);
+    button.setAttribute("aria-pressed",active ? "true":"false");
+  });
+
+  $("rainbowOption").hidden=mode!=="solid";
+  $("modeControls").hidden=rainbow;
+  $("solidControls").hidden=mode!=="solid" || rainbow;
+  $("gradientControls").hidden=mode!=="gradient";
+
+  const frequencyLine=$("frequencyLine");
+  frequencyLine.hidden=mode==="solid" && !rainbow;
+  if(rainbow){
+    $("rainbowFrequencySlot").appendChild(frequencyLine);
+  }else{
+    $("gradientFrequencySlot").appendChild(frequencyLine);
+  }
+
+  closeColorPicker();
   render();
 }
 
@@ -649,7 +730,7 @@ const PALETTE_GROUPS = {
 function syncPaletteSelection(groupId,selectedCode){
   const normalizedCode=selectedCode===null ? "":String(selectedCode).toUpperCase();
   PALETTE_GROUPS[groupId].forEach(containerId=>{
-    document.querySelectorAll(`#${containerId} .swatch`).forEach(swatch=>{
+    document.querySelectorAll(`#${containerId} [data-code]`).forEach(swatch=>{
       swatch.classList.toggle("selected", swatch.dataset.code===normalizedCode);
     });
   });
@@ -657,7 +738,7 @@ function syncPaletteSelection(groupId,selectedCode){
 
 function clearPaletteSelection(groupId){
   PALETTE_GROUPS[groupId].forEach(containerId=>{
-    document.querySelectorAll(`#${containerId} .swatch`).forEach(swatch=>swatch.classList.remove("selected"));
+    document.querySelectorAll(`#${containerId} [data-code]`).forEach(swatch=>swatch.classList.remove("selected"));
   });
 }
 
@@ -668,52 +749,89 @@ function getSwatchTextColor(css){
   return (r*0.299 + g*0.587 + b*0.114) > 165 ? "#111":"#fff";
 }
 
-function createCodePalette(containerId,colors,groupId,getSelected,onSelect){
+function updateEndpointUI(kind){
+  const code=$(kind+"Code").value.toUpperCase();
+  const trigger=$(kind+"ColorTrigger");
+  trigger.style.background=getPaletteCss(code);
+  trigger.title=`${kind==="start" ? "Start":"End"} color: ${code}`;
+  syncPaletteSelection(kind,code);
+}
+
+function closeColorPicker(kind){
+  const kinds=kind ? [kind]:["start","end"];
+  kinds.forEach(item=>{
+    $(item+"Picker").hidden=true;
+    $(item+"ColorTrigger").setAttribute("aria-expanded","false");
+  });
+  if(!kind || openPicker===kind) openPicker=null;
+}
+
+function openColorPicker(kind){
+  closeColorPicker();
+  $(kind+"Picker").hidden=false;
+  $(kind+"ColorTrigger").setAttribute("aria-expanded","true");
+  $(kind+"CodeError").textContent="";
+  openPicker=kind;
+}
+
+function setEndpointCode(kind,rawCode,closeAfter){
+  const code=String(rawCode).trim().replace(/^#/,"").toUpperCase();
+  if(!/^[0-9A-F]{5}$/.test(code)){
+    $(kind+"CodeError").textContent="Enter exactly five hexadecimal characters (0–9 or A–F).";
+    return false;
+  }
+  $(kind+"Code").value=code;
+  $(kind+"CodeError").textContent="";
+  updateEndpointUI(kind);
+  render();
+  if(closeAfter) closeColorPicker(kind);
+  return true;
+}
+
+function createCodePalette(containerId,colors,groupId,getSelected,onSelect,variant){
   colors.forEach(([name,code,css])=>{
-    const d=document.createElement("div");
+    const d=document.createElement("button");
+    d.type="button";
     const selected=String(getSelected() ?? "").toUpperCase();
-    d.className="swatch"+(code===selected?" selected":"");
+    d.className=(variant==="solid" ? "color-swatch":"picker-swatch")+(code===selected?" selected":"");
     d.dataset.code=code;
     d.style.background=css;
-    d.style.color=getSwatchTextColor(css);
-    const label=document.createElement("span");
-    label.className="swatch-label";
-    label.textContent=name ? `${name} ${code}`:code;
-    const badge=document.createElement("span");
-    badge.className="order-badge";
-    d._orderBadge=badge;
-    d.appendChild(label);
-    d.appendChild(badge);
+    d.title=name ? `${name} (${code})`:code;
+    d.setAttribute("aria-label",d.title);
+    if(variant==="solid"){
+      const badge=document.createElement("span");
+      badge.className="order-badge";
+      d._orderBadge=badge;
+      d.appendChild(badge);
+    }
     d.onclick=()=>{
       onSelect(code);
-      syncPaletteSelection(groupId,code);
+      if(variant!=="solid") syncPaletteSelection(groupId,code);
       render();
     };
     $(containerId).appendChild(d);
   });
 }
 
-createCodePalette("palette",PALETTE,"solid",()=>"",handleSolidColorChoice);
-createCodePalette("experimentalSolidPalette",EXPERIMENTAL_PALETTE,"solid",()=>"",handleSolidColorChoice);
-createCodePalette("startPalette",PALETTE,"start",()=>$("startCode").value,code=>{$("startCode").value=code;});
-createCodePalette("experimentalStartPalette",EXPERIMENTAL_PALETTE,"start",()=>$("startCode").value,code=>{$("startCode").value=code;});
-createCodePalette("endPalette",PALETTE,"end",()=>$("endCode").value,code=>{$("endCode").value=code;});
-createCodePalette("experimentalEndPalette",EXPERIMENTAL_PALETTE,"end",()=>$("endCode").value,code=>{$("endCode").value=code;});
+createCodePalette("palette",PALETTE,"solid",()=>"",handleSolidColorChoice,"solid");
+createCodePalette("experimentalSolidPalette",EXPERIMENTAL_PALETTE,"solid",()=>"",handleSolidColorChoice,"solid");
+createCodePalette("startPalette",PALETTE,"start",()=>$("startCode").value,code=>setEndpointCode("start",code,true),"picker");
+createCodePalette("experimentalStartPalette",EXPERIMENTAL_PALETTE,"start",()=>$("startCode").value,code=>setEndpointCode("start",code,true),"picker");
+createCodePalette("endPalette",PALETTE,"end",()=>$("endCode").value,code=>setEndpointCode("end",code,true),"picker");
+createCodePalette("experimentalEndPalette",EXPERIMENTAL_PALETTE,"end",()=>$("endCode").value,code=>setEndpointCode("end",code,true),"picker");
 
-const noColorSwatch=document.createElement("div");
-noColorSwatch.className="swatch no-color-swatch";
+const noColorSwatch=document.createElement("button");
+noColorSwatch.type="button";
+noColorSwatch.className="color-swatch no-color-swatch";
 noColorSwatch.dataset.code="";
-const noColorLabel=document.createElement("span");
-noColorLabel.className="swatch-label";
-noColorLabel.textContent="No color";
+noColorSwatch.title="No color";
+noColorSwatch.setAttribute("aria-label","No color");
 const noColorBadge=document.createElement("span");
 noColorBadge.className="order-badge";
 noColorSwatch._orderBadge=noColorBadge;
-noColorSwatch.appendChild(noColorLabel);
 noColorSwatch.appendChild(noColorBadge);
 noColorSwatch.onclick=()=>{
   handleSolidColorChoice(null);
-  syncPaletteSelection("solid",null);
   render();
 };
 $("palette").appendChild(noColorSwatch);
@@ -740,14 +858,70 @@ textControl.addEventListener("scroll",()=>{
   $("preview").scrollLeft=textControl.scrollLeft;
 });
 
-["mode","startCode","endCode","stepSize","stepUnit","solidUnit","newlineEach","newlineSpaces"].forEach(id=>{
-  const handleChange = id==="mode" ? updateModeUI : ()=>{
-    if(id==="startCode") syncPaletteSelection("start",$("startCode").value);
-    if(id==="endCode") syncPaletteSelection("end",$("endCode").value);
+document.querySelectorAll(".mode-button").forEach(button=>{
+  button.onclick=()=>{
+    $("mode").value=button.dataset.mode;
+    updateModeUI();
+  };
+});
+
+document.querySelectorAll("[data-solid-unit]").forEach(button=>{
+  button.onclick=()=>{
+    $("solidUnit").value=button.dataset.solidUnit;
+    document.querySelectorAll("[data-solid-unit]").forEach(option=>{
+      const active=option===button;
+      option.classList.toggle("active",active);
+      option.setAttribute("aria-pressed",active ? "true":"false");
+    });
     render();
   };
-  $(id).addEventListener("input",handleChange);
-  $(id).addEventListener("change",handleChange);
+});
+
+document.querySelectorAll("[data-step-unit]").forEach(button=>{
+  button.onclick=()=>{
+    $("stepUnit").value=button.dataset.stepUnit;
+    document.querySelectorAll("[data-step-unit]").forEach(option=>{
+      const active=option===button;
+      option.classList.toggle("active",active);
+      option.setAttribute("aria-pressed",active ? "true":"false");
+    });
+    render();
+  };
+});
+
+["stepSize","newlineEach","newlineSpaces"].forEach(id=>{
+  $(id).addEventListener("input",render);
+  $(id).addEventListener("change",render);
+});
+
+$("rainbowMode").addEventListener("change",updateModeUI);
+
+["start","end"].forEach(kind=>{
+  $(kind+"ColorTrigger").onclick=event=>{
+    event.stopPropagation();
+    if(openPicker===kind) closeColorPicker(kind);
+    else openColorPicker(kind);
+  };
+  $("apply"+(kind==="start" ? "Start":"End")+"Code").onclick=()=>setEndpointCode(kind,$(kind+"Code").value,true);
+  $(kind+"Code").addEventListener("keydown",event=>{
+    if(event.key==="Enter"){
+      event.preventDefault();
+      setEndpointCode(kind,event.currentTarget.value,true);
+    }
+  });
+  $(kind+"Picker").addEventListener("pointerdown",event=>event.stopPropagation());
+});
+
+document.querySelectorAll("[data-close-picker]").forEach(button=>{
+  button.onclick=()=>closeColorPicker(button.dataset.closePicker);
+});
+
+document.addEventListener("pointerdown",()=>{
+  if(openPicker) closeColorPicker();
+});
+
+document.addEventListener("keydown",event=>{
+  if(event.key==="Escape" && openPicker) closeColorPicker();
 });
 
 document.querySelectorAll(".composer-tab").forEach(tab=>{
@@ -756,15 +930,12 @@ document.querySelectorAll(".composer-tab").forEach(tab=>{
 
 $("undoSolidColor").onclick=()=>{
   solidPattern.pop();
-  if(solidPattern.length) syncPaletteSelection("solid",solidPattern[solidPattern.length-1]);
-  else clearPaletteSelection("solid");
   renderSolidPattern();
   render();
 };
 
 $("clearSolidPattern").onclick=()=>{
   solidPattern=[];
-  clearPaletteSelection("solid");
   renderSolidPattern();
   render();
 };
@@ -773,6 +944,7 @@ $("clearSolidSelections").onclick=()=>{
   solidSelections=[];
   savedTextSelection=null;
   updateSelectionStatus();
+  renderSolidPattern();
   render();
 };
 
@@ -815,6 +987,8 @@ if(donateToggle){
   };
 }
 
+updateEndpointUI("start");
+updateEndpointUI("end");
 renderSolidPattern();
 updateSelectionStatus();
 updateModeUI();
