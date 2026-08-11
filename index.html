@@ -229,6 +229,7 @@
   .symbol-toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,180px);gap:7px;margin:10px 0 7px}
   .symbol-toolbar input,.symbol-toolbar select{min-width:0;padding:8px 9px;font-size:12px}
   .symbol-filter-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .symbol-status-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .symbol-invalid-filter{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11px}
   .symbol-invalid-filter input{width:auto}
   .symbol-count{font-size:10px;color:var(--muted)}
@@ -237,11 +238,14 @@
   .symbol-section-title{display:flex;justify-content:space-between;gap:8px;margin:0 0 5px;font-size:12px;color:var(--muted)}
   .symbol-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
   .symbol-card{padding:5px;border:1px solid var(--border);border-radius:9px;background:var(--panel2)}
+  .symbol-card.valid{border-color:#3d9b62;background:#1b3025}
   .symbol-card.invalid{border-color:#9b772c;background:#30291d}
   .symbol-glyph{min-height:45px;padding:5px;background:#171b23;color:var(--text);font-size:24px;line-height:1}
+  .symbol-card.valid .symbol-glyph{color:#81e6a7}
   .symbol-card.invalid .symbol-glyph{color:#ffd37a}
-  .symbol-card-actions{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px}
+  .symbol-card-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:4px}
   .symbol-card-actions button{min-width:0;padding:4px 2px;font-size:8px}
+  .symbol-valid-button.active{background:#267446;color:#d7ffe5;border-color:#49ae70}
   .symbol-invalid-button.active{background:#8b681f;color:#fff1c2;border-color:#c89b36}
   .invalid-symbol-preview{color:#ffd37a!important;text-decoration:underline wavy #ffd37a;text-decoration-thickness:1px}
   .symbol-empty{padding:24px 10px;border:1px dashed var(--border);border-radius:10px;text-align:center;color:var(--muted);font-size:12px}
@@ -283,7 +287,7 @@
     <div id="editorShell" class="editor-shell">
       <div id="preview" class="editor-preview" aria-hidden="true"></div>
       <textarea id="text" class="editor-input preview-editing" placeholder="Type something..." aria-label="Message text">Bengarii</textarea>
-      <textarea id="output" class="editor-input syntax-input" aria-label="Full generated syntax" readonly hidden></textarea>
+      <textarea id="output" class="editor-input syntax-input" aria-label="Full syntax, directly editable" spellcheck="false" hidden></textarea>
 
       <div class="editor-toolbar" aria-label="Editor controls">
         <div class="editor-control-group" aria-label="Newline options">
@@ -470,13 +474,16 @@
       <h2 id="symbolTitle">Symbol Library</h2>
       <button id="symbolsClose" type="button" class="secondary my-art-close">Close</button>
     </div>
-    <div class="tiny">Tap a symbol to insert it at the cursor. You can also copy it or mark it invalid for Forge Master.</div>
+    <div class="tiny">Tap a symbol to insert it. Mark it Valid or Invalid after testing; tap the selected status again to return it to unmarked.</div>
     <div class="symbol-toolbar">
       <input id="symbolSearch" type="search" placeholder="Search symbol, category, or U+ code" aria-label="Search symbols">
       <select id="symbolCategory" aria-label="Symbol category"></select>
     </div>
     <div class="symbol-filter-row">
-      <label class="symbol-invalid-filter"><input id="symbolInvalidOnly" type="checkbox"> Invalid only</label>
+      <div class="symbol-status-filters">
+        <label class="symbol-invalid-filter"><input id="symbolValidOnly" type="checkbox"> Valid only</label>
+        <label class="symbol-invalid-filter"><input id="symbolInvalidOnly" type="checkbox"> Invalid only</label>
+      </div>
       <span id="symbolCount" class="symbol-count"></span>
     </div>
     <div id="symbolStatus" class="symbol-status" aria-live="polite"></div>
@@ -517,6 +524,8 @@ const RAINBOW = ["F0000","F0800","F0F00","08F00","00F00","00F0F","0000F","F111F"
 const MAX_MESSAGE_LENGTH = 275;
 const MY_ART_STORAGE_KEY = "forgeMasterMyArt.v1";
 const INVALID_SYMBOL_STORAGE_KEY = "forgeMasterInvalidSymbols.v1";
+const VALID_SYMBOL_STORAGE_KEY = "forgeMasterValidSymbols.v1";
+const CUSTOM_SYMBOL_STORAGE_KEY = "forgeMasterCustomSymbols.v1";
 const DEFAULT_INVALID_SYMBOLS = ["◕","✧"];
 const SYMBOL_CATEGORIES = [
   {
@@ -574,6 +583,12 @@ const SYMBOL_CATEGORIES = [
     symbols:[..."♡♥❤❥ღ❣❦❧☼☽☾☀☁☂☄♫♪♬♩♭♮♯✓✔✕✖✚✜∞≈≋≡±÷×§¶†‡"],
   },
 ];
+const CUSTOM_SYMBOL_CATEGORY = {
+  id:"custom",
+  name:"My additions",
+  keywords:"custom added confirmed artwork symbol",
+  symbols:[],
+};
 const SYMBOL_LIBRARY = (()=>{
   const seen=new Set();
   return SYMBOL_CATEGORIES.flatMap(category=>category.symbols.slice(0,28).filter(symbol=>{
@@ -582,6 +597,7 @@ const SYMBOL_LIBRARY = (()=>{
     return true;
   }).map(symbol=>({symbol,category})));
 })();
+const BASE_SYMBOLS = new Set(SYMBOL_LIBRARY.map(item=>item.symbol));
 
 let solidColor = null;
 let solidPattern = [];
@@ -596,6 +612,9 @@ let myArtStorageAvailable = true;
 let myArtTransferUrl = "";
 let editingArtId = null;
 let invalidSymbols = new Set(DEFAULT_INVALID_SYMBOLS);
+let validSymbols = new Set();
+let customSymbols = new Set();
+let manualSyntaxOverride = null;
 const $ = id => document.getElementById(id);
 
 function hexDigit(c){ return parseInt(c,16); }
@@ -776,6 +795,7 @@ function captureTextSelection(){
 }
 
 function handleSolidColorChoice(code){
+  clearManualSyntaxOverride();
   const text=$("text").value;
   if(savedTextSelection && savedTextSelection.text===text && savedTextSelection.start<savedTextSelection.end){
     solidSelections.push({
@@ -887,6 +907,40 @@ function updateArtCompatibility(text){
   note.hidden=!messages.length;
 }
 
+function syntaxTextHasVisibleCharacter(text){
+  return text.replace(/\\n/g,"").replace(/\s/gu,"").length>0;
+}
+
+function optimizeColorSyntax(syntax){
+  const colorTag=/<#([0-9A-F]{5})\/>/giu;
+  let result="";
+  let activeCode=null;
+  let pendingTag=null;
+  let sourceIndex=0;
+  let match;
+
+  const appendText=text=>{
+    if(pendingTag){
+      if(syntaxTextHasVisibleCharacter(text)){
+        if(pendingTag.code!==activeCode){
+          result += pendingTag.raw;
+          activeCode=pendingTag.code;
+        }
+        pendingTag=null;
+      }
+    }
+    result += text;
+  };
+
+  while((match=colorTag.exec(syntax))!==null){
+    appendText(syntax.slice(sourceIndex,match.index));
+    pendingTag={raw:match[0],code:match[1].toUpperCase()};
+    sourceIndex=colorTag.lastIndex;
+  }
+  appendText(syntax.slice(sourceIndex));
+  return result;
+}
+
 function render(){
   const text = $("text").value;
   const mode = $("mode").value;
@@ -939,15 +993,18 @@ function render(){
     });
   });
 
-  const outputChanged = $("output").value !== out;
-  $("output").value = out;
-  updateLengthUI(out);
+  const optimizedOutput=optimizeColorSyntax(out);
+  const finalOutput=manualSyntaxOverride===null ? optimizedOutput:manualSyntaxOverride;
+  const outputChanged = $("output").value !== finalOutput;
+  $("output").value = finalOutput;
+  updateLengthUI(finalOutput);
   if(outputChanged) resetCopyWarning();
   $("preview").innerHTML = preview || "&nbsp;";
   updateArtCompatibility(text);
 }
 
 function setComposerView(view){
+  if(activeComposerView==="syntax" && view!=="syntax") applyDirectSyntaxEdit();
   activeComposerView=view;
   const showSyntax=view==="syntax";
   $("text").hidden=showSyntax;
@@ -1083,6 +1140,33 @@ function parseSyntaxForEditing(syntax){
   return {text,selections};
 }
 
+function clearManualSyntaxOverride(){
+  manualSyntaxOverride=null;
+}
+
+function applyDirectSyntaxEdit(){
+  if(manualSyntaxOverride===null) return false;
+  const exactSyntax=manualSyntaxOverride;
+  const parsed=parseSyntaxForEditing(exactSyntax);
+  $("text").value=parsed.text;
+  solidSelectionSource=parsed.text;
+  savedTextSelection=null;
+  solidColor=null;
+  solidPattern=[];
+  solidSelections=parsed.selections;
+  $("mode").value="solid";
+  $("patternMode").checked=false;
+  $("rainbowMode").checked=false;
+  setNewlineControl("each",false);
+  setNewlineControl("spaces",false);
+  renderSolidPattern();
+  updateSelectionStatus();
+  updateModeUI();
+  $("output").value=exactSyntax;
+  updateLengthUI(exactSyntax);
+  return true;
+}
+
 function setButtonGroupValue(selector,dataKey,value){
   document.querySelectorAll(selector).forEach(button=>{
     const active=button.dataset[dataKey]===value;
@@ -1106,8 +1190,10 @@ function isValidColorCode(code){
 }
 
 function restoreSavedArt(template){
+  clearManualSyntaxOverride();
   const parsed=parseSyntaxForEditing(template.syntax);
   const state=template.editorState && template.editorState.version===1 ? template.editorState:null;
+  const preserveExactSyntax=Boolean(template.manualSyntax || !state);
   const restoredText=state && typeof template.text==="string" ? template.text:parsed.text;
 
   $("text").value=restoredText;
@@ -1151,6 +1237,11 @@ function restoreSavedArt(template){
   updateSelectionStatus();
   updateModeUI();
   setComposerView("preview");
+  if(preserveExactSyntax){
+    manualSyntaxOverride=template.syntax;
+    $("output").value=template.syntax;
+    updateLengthUI(template.syntax);
+  }
 
   editingArtId=template.id;
   $("saveArtBtn").textContent="Update My Art";
@@ -1269,6 +1360,11 @@ function renderMyArtList(){
     editButton.type="button";
     editButton.dataset.artEdit=template.id;
     editButton.onclick=()=>restoreSavedArt(template);
+    const confirmButton=createMyArtElement("button","secondary","Confirm");
+    confirmButton.type="button";
+    confirmButton.dataset.artConfirm=template.id;
+    confirmButton.title="Mark every symbol used in this artwork as valid";
+    confirmButton.onclick=()=>confirmSavedArtSymbols(template);
     const copyButton=createMyArtElement("button","secondary","Copy");
     copyButton.type="button";
     copyButton.dataset.artCopy=template.id;
@@ -1282,6 +1378,7 @@ function renderMyArtList(){
     deleteButton.dataset.artDelete=template.id;
     deleteButton.onclick=()=>deleteSavedArt(template.id);
     actions.appendChild(editButton);
+    actions.appendChild(confirmButton);
     actions.appendChild(copyButton);
     actions.appendChild(qrButton);
     actions.appendChild(deleteButton);
@@ -1291,6 +1388,7 @@ function renderMyArtList(){
 }
 
 function openMyArt(prepareToSave=false){
+  if(prepareToSave) applyDirectSyntaxEdit();
   closeArtQr();
   renderMyArtList();
   $("myArtModal").hidden=false;
@@ -1312,6 +1410,7 @@ function closeMyArt(){
 }
 
 function saveCurrentArt(){
+  applyDirectSyntaxEdit();
   const syntax=$("output").value;
   if(!syntax){
     showMyArtStatus("There is nothing to save yet.",true);
@@ -1323,6 +1422,7 @@ function saveCurrentArt(){
     name,
     text:$("text").value,
     syntax,
+    manualSyntax:manualSyntaxOverride!==null,
     editorState:getCurrentEditorState(),
     savedAt:Date.now(),
   };
@@ -1359,59 +1459,81 @@ async function copyTextValue(value){
   }
 }
 
-function loadInvalidSymbols(){
+function loadSymbolStatuses(){
   try{
     if(typeof localStorage==="undefined") throw new Error("Local storage is unavailable");
-    const stored=localStorage.getItem(INVALID_SYMBOL_STORAGE_KEY);
-    if(stored===null){
-      invalidSymbols=new Set(DEFAULT_INVALID_SYMBOLS);
-      return;
-    }
-    const parsed=JSON.parse(stored);
-    if(!Array.isArray(parsed)) throw new Error("Invalid symbol data");
-    invalidSymbols=new Set(parsed.filter(symbol=>typeof symbol==="string" && symbol.length<=4));
+    const storedInvalid=localStorage.getItem(INVALID_SYMBOL_STORAGE_KEY);
+    const storedValid=localStorage.getItem(VALID_SYMBOL_STORAGE_KEY);
+    const storedCustom=localStorage.getItem(CUSTOM_SYMBOL_STORAGE_KEY);
+    const parsedInvalid=storedInvalid===null ? DEFAULT_INVALID_SYMBOLS:JSON.parse(storedInvalid);
+    const parsedValid=storedValid===null ? []:JSON.parse(storedValid);
+    const parsedCustom=storedCustom===null ? []:JSON.parse(storedCustom);
+    if(!Array.isArray(parsedInvalid) || !Array.isArray(parsedValid) || !Array.isArray(parsedCustom)) throw new Error("Invalid symbol data");
+    invalidSymbols=new Set(parsedInvalid.filter(symbol=>typeof symbol==="string" && symbol.length<=4));
+    validSymbols=new Set(parsedValid.filter(symbol=>typeof symbol==="string" && symbol.length<=4));
+    customSymbols=new Set(parsedCustom.filter(symbol=>typeof symbol==="string" && symbol.length<=4 && !BASE_SYMBOLS.has(symbol)));
+    invalidSymbols.forEach(symbol=>validSymbols.delete(symbol));
   }catch(_){
     invalidSymbols=new Set(DEFAULT_INVALID_SYMBOLS);
+    validSymbols=new Set();
+    customSymbols=new Set();
   }
 }
 
-function persistInvalidSymbols(){
+function persistSymbolStatuses(){
   try{
     if(typeof localStorage==="undefined") throw new Error("Local storage is unavailable");
     localStorage.setItem(INVALID_SYMBOL_STORAGE_KEY,JSON.stringify([...invalidSymbols]));
+    localStorage.setItem(VALID_SYMBOL_STORAGE_KEY,JSON.stringify([...validSymbols]));
+    localStorage.setItem(CUSTOM_SYMBOL_STORAGE_KEY,JSON.stringify([...customSymbols]));
     return true;
   }catch(_){
-    $("symbolStatus").textContent="This browser blocked saving the invalid-symbol list.";
+    $("symbolStatus").textContent="This browser blocked saving the symbol-status lists.";
     return false;
   }
 }
 
-function populateSymbolCategories(){
+function getSymbolCollection(){
+  if(!customSymbols.size) return {categories:SYMBOL_CATEGORIES,library:SYMBOL_LIBRARY};
+  const customCategory={...CUSTOM_SYMBOL_CATEGORY,symbols:[...customSymbols]};
+  const customItems=customCategory.symbols.map(symbol=>({symbol,category:customCategory}));
+  return {
+    categories:[...SYMBOL_CATEGORIES,customCategory],
+    library:[...SYMBOL_LIBRARY,...customItems],
+  };
+}
+
+function populateSymbolCategories(categories){
   const select=$("symbolCategory");
-  if(select.children.length) return;
+  const selectedValue=select.value;
+  select.replaceChildren();
   const allOption=createMyArtElement("option","", "All categories");
   allOption.value="";
   select.appendChild(allOption);
-  SYMBOL_CATEGORIES.forEach(category=>{
+  categories.forEach(category=>{
     const option=createMyArtElement("option","",category.name);
     option.value=category.id;
     select.appendChild(option);
   });
+  select.value=categories.some(category=>category.id===selectedValue) ? selectedValue:"";
 }
 
 function renderSymbolLibrary(){
-  populateSymbolCategories();
+  const collection=getSymbolCollection();
+  populateSymbolCategories(collection.categories);
   const container=$("symbolSections");
   const query=$("symbolSearch").value.trim().toLocaleLowerCase();
   const selectedCategory=$("symbolCategory").value;
+  const validOnly=$("symbolValidOnly").checked;
   const invalidOnly=$("symbolInvalidOnly").checked;
   let visibleCount=0;
   container.replaceChildren();
 
-  SYMBOL_CATEGORIES.forEach(category=>{
+  collection.categories.forEach(category=>{
     if(selectedCategory && selectedCategory!==category.id) return;
-    const matches=SYMBOL_LIBRARY.filter(item=>{
+    const matches=collection.library.filter(item=>{
       if(item.category.id!==category.id) return false;
+      if(validOnly && !validSymbols.has(item.symbol)) return false;
       if(invalidOnly && !invalidSymbols.has(item.symbol)) return false;
       const hexadecimal=item.symbol.codePointAt(0).toString(16).toUpperCase();
       const searchText=(item.symbol+" "+category.name+" "+category.keywords+" U+"+hexadecimal+" "+hexadecimal).toLocaleLowerCase();
@@ -1428,8 +1550,9 @@ function renderSymbolLibrary(){
     const grid=createMyArtElement("div","symbol-grid");
 
     matches.forEach(item=>{
+      const isValid=validSymbols.has(item.symbol);
       const isInvalid=invalidSymbols.has(item.symbol);
-      const card=createMyArtElement("div","symbol-card"+(isInvalid ? " invalid":""));
+      const card=createMyArtElement("div","symbol-card"+(isValid ? " valid":"")+(isInvalid ? " invalid":""));
       const insertButton=createMyArtElement("button","symbol-glyph",item.symbol);
       insertButton.type="button";
       insertButton.title="Insert "+item.symbol+" at the cursor";
@@ -1440,11 +1563,16 @@ function renderSymbolLibrary(){
       const copyButton=createMyArtElement("button","secondary","Copy");
       copyButton.type="button";
       copyButton.onclick=()=>copyLibrarySymbol(item.symbol);
-      const invalidButton=createMyArtElement("button","secondary symbol-invalid-button"+(isInvalid ? " active":""),isInvalid ? "Restore":"Invalid");
+      const validButton=createMyArtElement("button","secondary symbol-valid-button"+(isValid ? " active":""),"Valid");
+      validButton.type="button";
+      validButton.setAttribute("aria-pressed",isValid ? "true":"false");
+      validButton.onclick=()=>toggleValidSymbol(item.symbol);
+      const invalidButton=createMyArtElement("button","secondary symbol-invalid-button"+(isInvalid ? " active":""),"Invalid");
       invalidButton.type="button";
       invalidButton.setAttribute("aria-pressed",isInvalid ? "true":"false");
       invalidButton.onclick=()=>toggleInvalidSymbol(item.symbol);
       actions.appendChild(copyButton);
+      actions.appendChild(validButton);
       actions.appendChild(invalidButton);
       card.appendChild(insertButton);
       card.appendChild(actions);
@@ -1455,7 +1583,7 @@ function renderSymbolLibrary(){
     container.appendChild(section);
   });
 
-  $("symbolCount").textContent=visibleCount+" of "+SYMBOL_LIBRARY.length+" symbols";
+  $("symbolCount").textContent=visibleCount+" of "+collection.library.length+" symbols";
   if(!visibleCount){
     container.appendChild(createMyArtElement("div","symbol-empty","No symbols match this search."));
   }
@@ -1479,15 +1607,35 @@ async function copyLibrarySymbol(symbol){
   $("symbolStatus").textContent=copied ? "Copied "+symbol+".":"Clipboard access was blocked.";
 }
 
+function toggleValidSymbol(symbol){
+  const wasValid=validSymbols.has(symbol);
+  if(wasValid){
+    validSymbols.delete(symbol);
+  }else{
+    validSymbols.add(symbol);
+    invalidSymbols.delete(symbol);
+  }
+  persistSymbolStatuses();
+  renderSymbolLibrary();
+  render();
+  $("symbolStatus").textContent=wasValid ?
+    symbol+" returned to unmarked.":
+    symbol+" marked valid. Its tile is now green.";
+}
+
 function toggleInvalidSymbol(symbol){
   const wasInvalid=invalidSymbols.has(symbol);
-  if(wasInvalid) invalidSymbols.delete(symbol);
-  else invalidSymbols.add(symbol);
-  persistInvalidSymbols();
+  if(wasInvalid){
+    invalidSymbols.delete(symbol);
+  }else{
+    invalidSymbols.add(symbol);
+    validSymbols.delete(symbol);
+  }
+  persistSymbolStatuses();
   renderSymbolLibrary();
   render();
   $("symbolStatus").textContent=wasInvalid ?
-    symbol+" restored as potentially valid.":
+    symbol+" returned to unmarked.":
     symbol+" marked invalid. It will appear as □ in the preview.";
 }
 
@@ -1506,6 +1654,42 @@ function closeSymbolLibrary(){
 async function copySavedArt(template){
   const copied=await copyTextValue(template.syntax);
   showMyArtStatus(copied ? `Copied “${template.name}”.`:"Clipboard access was blocked.",!copied);
+}
+
+function getArtworkSymbols(template){
+  const source=typeof template.text==="string" ? template.text:syntaxToPlainText(template.syntax);
+  return [...new Set([...source].filter(symbol=>
+    !/\s/u.test(symbol) &&
+    !/[A-Za-z0-9]/.test(symbol) &&
+    symbol!=="\uFE0F" &&
+    symbol!=="\u200D"
+  ))];
+}
+
+function confirmSavedArtSymbols(template){
+  const symbols=getArtworkSymbols(template);
+  if(!symbols.length){
+    showMyArtStatus("“"+template.name+"” contains no library-style symbols to confirm.");
+    return;
+  }
+
+  const additions=[];
+  symbols.forEach(symbol=>{
+    validSymbols.add(symbol);
+    invalidSymbols.delete(symbol);
+    if(!BASE_SYMBOLS.has(symbol) && !customSymbols.has(symbol)){
+      customSymbols.add(symbol);
+      additions.push(symbol);
+    }
+  });
+  persistSymbolStatuses();
+  renderSymbolLibrary();
+  render();
+  renderMyArtList();
+  showMyArtStatus(
+    "Confirmed "+symbols.length+" symbol"+(symbols.length===1 ? "":"s")+" from “"+template.name+"” as valid."+
+    (additions.length ? " Added "+additions.length+" to My additions: "+additions.join(" "):"")
+  );
 }
 
 function deleteSavedArt(id){
@@ -1608,6 +1792,7 @@ function setEndpointCode(kind,rawCode,closeAfter){
     $(kind+"CodeError").textContent="Enter exactly five hexadecimal characters (0–9 or A–F).";
     return false;
   }
+  clearManualSyntaxOverride();
   $(kind+"Code").value=code;
   $(kind+"CodeError").textContent="";
   updateEndpointUI(kind);
@@ -1725,6 +1910,7 @@ function remapSolidSelections(oldText,newText){
 
 function handleTextChange(){
   if(solidSelectionSource!==textControl.value){
+    clearManualSyntaxOverride();
     remapSolidSelections(solidSelectionSource,textControl.value);
     solidSelectionSource=textControl.value;
     savedTextSelection=null;
@@ -1734,6 +1920,13 @@ function handleTextChange(){
 }
 textControl.addEventListener("input",handleTextChange);
 textControl.addEventListener("change",handleTextChange);
+const syntaxControl=$("output");
+syntaxControl.addEventListener("input",()=>{
+  manualSyntaxOverride=syntaxControl.value;
+  updateLengthUI(manualSyntaxOverride);
+  resetCopyWarning();
+  $("status").textContent="Direct syntax edits are active. Return to Preview to apply them visually.";
+});
 textControl.addEventListener("scroll",()=>{
   $("preview").scrollTop=textControl.scrollTop;
   $("preview").scrollLeft=textControl.scrollLeft;
@@ -1741,6 +1934,7 @@ textControl.addEventListener("scroll",()=>{
 
 document.querySelectorAll(".mode-button").forEach(button=>{
   button.onclick=()=>{
+    clearManualSyntaxOverride();
     $("mode").value=button.dataset.mode;
     updateModeUI();
   };
@@ -1748,6 +1942,7 @@ document.querySelectorAll(".mode-button").forEach(button=>{
 
 document.querySelectorAll("[data-solid-unit]").forEach(button=>{
   button.onclick=()=>{
+    clearManualSyntaxOverride();
     $("solidUnit").value=button.dataset.solidUnit;
     document.querySelectorAll("[data-solid-unit]").forEach(option=>{
       const active=option===button;
@@ -1760,6 +1955,7 @@ document.querySelectorAll("[data-solid-unit]").forEach(button=>{
 
 document.querySelectorAll("[data-step-unit]").forEach(button=>{
   button.onclick=()=>{
+    clearManualSyntaxOverride();
     $("stepUnit").value=button.dataset.stepUnit;
     document.querySelectorAll("[data-step-unit]").forEach(option=>{
       const active=option===button;
@@ -1772,6 +1968,7 @@ document.querySelectorAll("[data-step-unit]").forEach(button=>{
 
 document.querySelectorAll("[data-newline-toggle]").forEach(button=>{
   button.onclick=()=>{
+    clearManualSyntaxOverride();
     const input=button.dataset.newlineToggle==="each" ? $("newlineEach"):$("newlineSpaces");
     input.checked=!input.checked;
     button.classList.toggle("active",input.checked);
@@ -1781,13 +1978,21 @@ document.querySelectorAll("[data-newline-toggle]").forEach(button=>{
 });
 
 ["stepSize","newlineEach","newlineSpaces"].forEach(id=>{
-  $(id).addEventListener("input",render);
-  $(id).addEventListener("change",render);
+  const updateGeneratedSyntax=()=>{
+    clearManualSyntaxOverride();
+    render();
+  };
+  $(id).addEventListener("input",updateGeneratedSyntax);
+  $(id).addEventListener("change",updateGeneratedSyntax);
 });
 
-$("rainbowMode").addEventListener("change",updateModeUI);
+$("rainbowMode").addEventListener("change",()=>{
+  clearManualSyntaxOverride();
+  updateModeUI();
+});
 
 $("patternMode").addEventListener("change",()=>{
+  clearManualSyntaxOverride();
   if($("patternMode").checked && !solidPattern.length && solidColor!==null){
     solidPattern.push(solidColor);
   }
@@ -1848,24 +2053,34 @@ $("symbolsOpen").onclick=openSymbolLibrary;
 $("symbolsClose").onclick=closeSymbolLibrary;
 $("symbolSearch").addEventListener("input",renderSymbolLibrary);
 $("symbolCategory").addEventListener("change",renderSymbolLibrary);
-$("symbolInvalidOnly").addEventListener("change",renderSymbolLibrary);
+$("symbolValidOnly").addEventListener("change",()=>{
+  if($("symbolValidOnly").checked) $("symbolInvalidOnly").checked=false;
+  renderSymbolLibrary();
+});
+$("symbolInvalidOnly").addEventListener("change",()=>{
+  if($("symbolInvalidOnly").checked) $("symbolValidOnly").checked=false;
+  renderSymbolLibrary();
+});
 $("symbolModal").addEventListener("pointerdown",event=>{
   if(event.target===$("symbolModal")) closeSymbolLibrary();
 });
 
 $("undoSolidColor").onclick=()=>{
+  clearManualSyntaxOverride();
   solidPattern.pop();
   renderSolidPattern();
   render();
 };
 
 $("clearSolidPattern").onclick=()=>{
+  clearManualSyntaxOverride();
   solidPattern=[];
   renderSolidPattern();
   render();
 };
 
 $("clearSolidSelections").onclick=()=>{
+  clearManualSyntaxOverride();
   solidSelections=[];
   savedTextSelection=null;
   updateSelectionStatus();
@@ -1912,7 +2127,7 @@ if(donateToggle){
   };
 }
 
-loadInvalidSymbols();
+loadSymbolStatuses();
 loadMyArtTemplates();
 renderMyArtList();
 importArtFromLocation();
