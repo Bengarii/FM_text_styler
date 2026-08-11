@@ -215,6 +215,13 @@
   .my-art-actions{display:flex;justify-content:flex-end;gap:5px}
   .my-art-actions button{width:auto;padding:6px 9px;font-size:10px}
   .my-art-delete{color:#ffb5b5!important}
+  .my-art-qr-panel{padding:10px;border:1px solid var(--border);border-radius:11px;background:var(--panel2);text-align:center}
+  .my-art-qr-title{margin-bottom:7px;font-size:13px;font-weight:800}
+  .my-art-qr-code{width:min(330px,100%);margin:0 auto;padding:8px;border-radius:9px;background:#fff;line-height:0}
+  .my-art-qr-code svg{display:block;width:100%;height:auto}
+  .my-art-qr-copy{margin:8px 0 4px;font-size:11px;color:var(--muted);line-height:1.4}
+  .my-art-qr-actions{display:flex;justify-content:center;gap:6px;margin-top:8px}
+  .my-art-qr-actions button{width:auto;padding:7px 10px;font-size:10px}
   @media(max-width:520px){.donate-frame{height:520px}}
 
 </style>
@@ -405,15 +412,26 @@
       <button id="myArtClose" type="button" class="secondary my-art-close">Close</button>
     </div>
     <div class="tiny">Saved locally in this browser until you clear this site’s browser data.</div>
-    <div class="my-art-save">
+    <div id="myArtSaveRow" class="my-art-save">
       <input id="myArtName" maxlength="60" placeholder="Name this creation" aria-label="Creation name">
       <button id="myArtSaveCurrent" type="button">Save current</button>
     </div>
     <div id="myArtStatus" class="my-art-status" aria-live="polite"></div>
+    <div id="myArtQrPanel" class="my-art-qr-panel" hidden>
+      <div id="myArtQrTitle" class="my-art-qr-title"></div>
+      <div id="myArtQrCode" class="my-art-qr-code" aria-label="Transfer QR code"></div>
+      <div class="my-art-qr-copy">Scan this with your phone’s camera. It will open this formatter and save the creation to My Art exactly as written.</div>
+      <div class="my-art-qr-actions">
+        <button id="myArtCopyLink" type="button">Copy transfer link</button>
+        <button id="myArtQrBack" type="button" class="secondary">Back</button>
+      </div>
+    </div>
     <div id="myArtList" class="my-art-list"></div>
   </div>
 </div>
 
+<script src="qrcode-generator.js"></script>
+<script src="qrcode-generator-utf8.js"></script>
 <script>
 const PALETTE = [
   ["Red","F0000","#ff1111"],
@@ -455,6 +473,7 @@ let activeComposerView = "preview";
 let openPicker = null;
 let myArtTemplates = [];
 let myArtStorageAvailable = true;
+let myArtTransferUrl = "";
 const $ = id => document.getElementById(id);
 
 function hexDigit(c){ return parseInt(c,16); }
@@ -841,6 +860,103 @@ function createMyArtElement(tag,className,text){
   return element;
 }
 
+function encodeBase64Url(text){
+  const bytes=new TextEncoder().encode(text);
+  let binary="";
+  bytes.forEach(byte=>{binary+=String.fromCharCode(byte);});
+  return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
+}
+
+function decodeBase64Url(value){
+  const base64=value.replace(/-/g,"+").replace(/_/g,"/") + "=".repeat((4-value.length%4)%4);
+  const binary=atob(base64);
+  const bytes=Uint8Array.from(binary,char=>char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function getTransferUrl(template){
+  const payload=encodeBase64Url(JSON.stringify({v:1,n:template.name,s:template.syntax}));
+  return `${location.href.split("#")[0]}#fm-art=${payload}`;
+}
+
+function syntaxToPlainText(syntax){
+  return syntax.replace(/<#[0-9A-F]{5}\/>/giu,"").replace(/\\n/g,"\n");
+}
+
+function closeArtQr(){
+  $("myArtQrPanel").hidden=true;
+  $("myArtList").hidden=false;
+  $("myArtSaveRow").hidden=false;
+  $("myArtQrCode").replaceChildren();
+  myArtTransferUrl="";
+}
+
+function showArtQr(template){
+  try{
+    if(typeof qrcode!=="function") throw new Error("QR generator unavailable");
+    if(!/^https?:$/i.test(location.protocol)) throw new Error("The hosted website is required for phone transfer");
+    myArtTransferUrl=getTransferUrl(template);
+    const qr=qrcode(0,"L");
+    qr.addData(myArtTransferUrl,"Byte");
+    qr.make();
+    $("myArtQrTitle").textContent=`Transfer “${template.name}”`;
+    $("myArtQrCode").innerHTML=qr.createSvgTag({
+      cellSize:4,
+      margin:16,
+      scalable:true,
+      title:`QR transfer for ${template.name}`,
+      alt:"Scan to import this creation into My Art",
+    });
+    $("myArtQrPanel").hidden=false;
+    $("myArtList").hidden=true;
+    $("myArtSaveRow").hidden=true;
+    showMyArtStatus("");
+  }catch(error){
+    myArtTransferUrl="";
+    const localFile=location.protocol==="file:";
+    showMyArtStatus(localFile ?
+      "QR transfer needs the hosted website address. Open the online version, then try again.":
+      "This creation is too large to fit in a QR code.",true);
+  }
+}
+
+async function copyTransferLink(){
+  if(!myArtTransferUrl) return;
+  const copied=await copyTextValue(myArtTransferUrl);
+  showMyArtStatus(copied ? "Transfer link copied.":"Clipboard access was blocked.",!copied);
+}
+
+function importArtFromLocation(){
+  const prefix="#fm-art=";
+  if(!location.hash.startsWith(prefix)) return;
+  const encoded=location.hash.slice(prefix.length);
+  try{
+    const payload=JSON.parse(decodeBase64Url(encoded));
+    if(payload?.v!==1 || typeof payload.n!=="string" || typeof payload.s!=="string" ||
+      !payload.s || payload.n.length>60 || payload.s.length>10000){
+      throw new Error("Invalid transfer payload");
+    }
+    const template={
+      id:`${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
+      name:payload.n || "Imported art",
+      text:syntaxToPlainText(payload.s),
+      syntax:payload.s,
+      savedAt:Date.now(),
+    };
+    if(!persistMyArtTemplates([template,...myArtTemplates].slice(0,100))) return;
+    renderMyArtList();
+    openMyArt(false);
+    showMyArtStatus(`Imported “${template.name}” from QR.`);
+  }catch(_){
+    openMyArt(false);
+    showMyArtStatus("That QR transfer link is invalid or damaged.",true);
+  }finally{
+    if(typeof history!=="undefined" && history.replaceState){
+      history.replaceState(null,document.title,location.href.split("#")[0]);
+    }
+  }
+}
+
 function renderMyArtList(){
   const list=$("myArtList");
   list.replaceChildren();
@@ -871,11 +987,16 @@ function renderMyArtList(){
     copyButton.type="button";
     copyButton.dataset.artCopy=template.id;
     copyButton.onclick=()=>copySavedArt(template);
+    const qrButton=createMyArtElement("button","secondary","QR");
+    qrButton.type="button";
+    qrButton.dataset.artQr=template.id;
+    qrButton.onclick=()=>showArtQr(template);
     const deleteButton=createMyArtElement("button","secondary my-art-delete","Delete");
     deleteButton.type="button";
     deleteButton.dataset.artDelete=template.id;
     deleteButton.onclick=()=>deleteSavedArt(template.id);
     actions.appendChild(copyButton);
+    actions.appendChild(qrButton);
     actions.appendChild(deleteButton);
     item.appendChild(actions);
     list.appendChild(item);
@@ -883,6 +1004,7 @@ function renderMyArtList(){
 }
 
 function openMyArt(prepareToSave=false){
+  closeArtQr();
   renderMyArtList();
   $("myArtModal").hidden=false;
   document.body.classList.add("modal-open");
@@ -895,6 +1017,7 @@ function openMyArt(prepareToSave=false){
 }
 
 function closeMyArt(){
+  closeArtQr();
   $("myArtModal").hidden=true;
   document.body.classList.remove("modal-open");
 }
@@ -1210,6 +1333,8 @@ $("myArtOpen").onclick=()=>openMyArt(false);
 $("saveArtBtn").onclick=()=>openMyArt(true);
 $("myArtClose").onclick=closeMyArt;
 $("myArtSaveCurrent").onclick=saveCurrentArt;
+$("myArtQrBack").onclick=closeArtQr;
+$("myArtCopyLink").onclick=copyTransferLink;
 $("myArtName").addEventListener("keydown",event=>{
   if(event.key==="Enter"){
     event.preventDefault();
@@ -1281,6 +1406,7 @@ if(donateToggle){
 
 loadMyArtTemplates();
 renderMyArtList();
+importArtFromLocation();
 updateEndpointUI("start");
 updateEndpointUI("end");
 renderSolidPattern();
