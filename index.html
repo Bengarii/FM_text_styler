@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="forge-master-symbol-api" content="https://forge-master-symbols.personal-dd4.workers.dev" />
 <title>Forge Master Chat Formatter</title>
 <style>
   :root{
@@ -229,6 +230,13 @@
   .symbol-toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,180px);gap:7px;margin:10px 0 7px}
   .symbol-toolbar input,.symbol-toolbar select{min-width:0;padding:8px 9px;font-size:12px}
   .symbol-filter-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .symbol-owner-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:9px 0 7px;padding:7px 8px;border:1px solid var(--border);border-radius:9px;background:var(--panel2)}
+  .symbol-owner-state{font-size:10px;color:var(--muted);line-height:1.35}
+  .symbol-owner-state.active{color:#81e6a7;font-weight:800}
+  .symbol-owner-bar button,.symbol-owner-login button,.symbol-owner-actions button{width:auto;padding:6px 8px;font-size:9px;white-space:nowrap}
+  .symbol-owner-login{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:5px;margin-bottom:8px;padding:7px;border:1px solid #566077;border-radius:9px;background:#171b23}
+  .symbol-owner-login input{min-width:0;padding:7px 8px;font-size:11px}
+  .symbol-owner-actions{display:flex;justify-content:flex-end;margin:0 0 7px}
   .symbol-status-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .symbol-invalid-filter{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11px}
   .symbol-invalid-filter input{width:auto}
@@ -243,7 +251,8 @@
   .symbol-glyph{min-height:45px;padding:5px;background:#171b23;color:var(--text);font-size:24px;line-height:1}
   .symbol-card.valid .symbol-glyph{color:#81e6a7}
   .symbol-card.invalid .symbol-glyph{color:#ffd37a}
-  .symbol-card-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:4px}
+  .symbol-card-actions{display:grid;grid-template-columns:1fr;gap:3px;margin-top:4px}
+  .symbol-card-actions.owner-editing{grid-template-columns:repeat(3,1fr)}
   .symbol-card-actions button{min-width:0;padding:4px 2px;font-size:8px}
   .symbol-valid-button.active{background:#267446;color:#d7ffe5;border-color:#49ae70}
   .symbol-invalid-button.active{background:#8b681f;color:#fff1c2;border-color:#c89b36}
@@ -255,6 +264,8 @@
     .top-actions{flex-direction:column;align-items:stretch}
     .top-actions button{padding:6px 8px;font-size:10px}
     .symbol-toolbar{grid-template-columns:1fr}
+    .symbol-owner-login{grid-template-columns:1fr 1fr}
+    .symbol-owner-login input{grid-column:1/-1}
     .symbol-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
   }
 
@@ -474,7 +485,20 @@
       <h2 id="symbolTitle">Symbol Library</h2>
       <button id="symbolsClose" type="button" class="secondary my-art-close">Close</button>
     </div>
-    <div class="tiny">Tap a symbol to insert it. Mark it Valid or Invalid after testing; tap the selected status again to return it to unmarked.</div>
+    <div id="symbolIntro" class="tiny">Tap a symbol to insert it. Shared Valid and Invalid marks are visible to everyone.</div>
+    <div class="symbol-owner-bar">
+      <span id="symbolOwnerState" class="symbol-owner-state">Shared library · read only</span>
+      <button id="symbolOwnerOpen" type="button" class="secondary">Owner sign in</button>
+      <button id="symbolOwnerSignOut" type="button" class="secondary" hidden>Sign out</button>
+    </div>
+    <div id="symbolOwnerLogin" class="symbol-owner-login" hidden>
+      <input id="symbolOwnerKey" type="password" autocomplete="current-password" placeholder="Private owner key" aria-label="Private owner key">
+      <button id="symbolOwnerUnlock" type="button">Unlock</button>
+      <button id="symbolOwnerCancel" type="button" class="secondary">Cancel</button>
+    </div>
+    <div id="symbolOwnerActions" class="symbol-owner-actions" hidden>
+      <button id="symbolImportLegacy" type="button" class="secondary" hidden>Import this device’s old marks</button>
+    </div>
     <div class="symbol-toolbar">
       <input id="symbolSearch" type="search" placeholder="Search symbol, category, or U+ code" aria-label="Search symbols">
       <select id="symbolCategory" aria-label="Symbol category"></select>
@@ -526,6 +550,10 @@ const MY_ART_STORAGE_KEY = "forgeMasterMyArt.v1";
 const INVALID_SYMBOL_STORAGE_KEY = "forgeMasterInvalidSymbols.v1";
 const VALID_SYMBOL_STORAGE_KEY = "forgeMasterValidSymbols.v1";
 const CUSTOM_SYMBOL_STORAGE_KEY = "forgeMasterCustomSymbols.v1";
+const OWNER_SESSION_STORAGE_KEY = "forgeMasterOwnerSession.v1";
+const LEGACY_SYMBOL_BACKUP_KEY = "forgeMasterLegacySymbolBackup.v1";
+const LEGACY_SYMBOL_IMPORTED_KEY = "forgeMasterLegacySymbolImported.v1";
+const SYMBOL_API_URL = (document.querySelector?.('meta[name="forge-master-symbol-api"]')?.content || "").replace(/\/$/u,"");
 const DEFAULT_INVALID_SYMBOLS = ["◕","✧"];
 const SYMBOL_CATEGORIES = [
   {
@@ -614,6 +642,9 @@ let editingArtId = null;
 let invalidSymbols = new Set(DEFAULT_INVALID_SYMBOLS);
 let validSymbols = new Set();
 let customSymbols = new Set();
+let ownerSessionToken = "";
+let ownerAuthenticated = false;
+let ownerLoginOpen = false;
 let manualSyntaxOverride = null;
 const $ = id => document.getElementById(id);
 
@@ -1360,11 +1391,6 @@ function renderMyArtList(){
     editButton.type="button";
     editButton.dataset.artEdit=template.id;
     editButton.onclick=()=>restoreSavedArt(template);
-    const confirmButton=createMyArtElement("button","secondary","Confirm");
-    confirmButton.type="button";
-    confirmButton.dataset.artConfirm=template.id;
-    confirmButton.title="Mark every symbol used in this artwork as valid";
-    confirmButton.onclick=()=>confirmSavedArtSymbols(template);
     const copyButton=createMyArtElement("button","secondary","Copy");
     copyButton.type="button";
     copyButton.dataset.artCopy=template.id;
@@ -1378,7 +1404,14 @@ function renderMyArtList(){
     deleteButton.dataset.artDelete=template.id;
     deleteButton.onclick=()=>deleteSavedArt(template.id);
     actions.appendChild(editButton);
-    actions.appendChild(confirmButton);
+    if(ownerAuthenticated){
+      const confirmButton=createMyArtElement("button","secondary","Confirm");
+      confirmButton.type="button";
+      confirmButton.dataset.artConfirm=template.id;
+      confirmButton.title="Mark every symbol used in this artwork as valid";
+      confirmButton.onclick=()=>confirmSavedArtSymbols(template);
+      actions.appendChild(confirmButton);
+    }
     actions.appendChild(copyButton);
     actions.appendChild(qrButton);
     actions.appendChild(deleteButton);
@@ -1493,6 +1526,222 @@ function persistSymbolStatuses(){
   }
 }
 
+function readStoredSymbolList(key){
+  try{
+    const value=JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(value) ? value.filter(symbol=>typeof symbol==="string" && [...symbol].length===1):[];
+  }catch(_){
+    return [];
+  }
+}
+
+function ensureLegacySymbolBackup(){
+  try{
+    if(localStorage.getItem(LEGACY_SYMBOL_BACKUP_KEY) || localStorage.getItem(LEGACY_SYMBOL_IMPORTED_KEY)) return;
+    localStorage.setItem(LEGACY_SYMBOL_BACKUP_KEY,JSON.stringify({
+      invalid:[...invalidSymbols],
+      valid:[...validSymbols],
+      custom:[...customSymbols],
+      savedAt:Date.now(),
+    }));
+  }catch(_){
+    // The public shared library still works when local storage is unavailable.
+  }
+}
+
+function getLegacySymbolBackup(){
+  try{
+    if(localStorage.getItem(LEGACY_SYMBOL_IMPORTED_KEY)) return null;
+    const value=JSON.parse(localStorage.getItem(LEGACY_SYMBOL_BACKUP_KEY) || "null");
+    if(!value || !Array.isArray(value.invalid) || !Array.isArray(value.valid) || !Array.isArray(value.custom)) return null;
+    return {
+      invalid:value.invalid.filter(symbol=>typeof symbol==="string" && [...symbol].length===1),
+      valid:value.valid.filter(symbol=>typeof symbol==="string" && [...symbol].length===1),
+      custom:value.custom.filter(symbol=>typeof symbol==="string" && [...symbol].length===1),
+    };
+  }catch(_){
+    return null;
+  }
+}
+
+function parseSharedSymbolSnapshot(value){
+  if(!value || value.version!==1 || !Array.isArray(value.symbols)) throw new Error("The shared library returned invalid data.");
+  return value.symbols.map(item=>{
+    if(!item || typeof item.symbol!=="string" || [...item.symbol].length!==1) throw new Error("The shared library returned an invalid symbol.");
+    if(item.status!==null && item.status!=="valid" && item.status!=="invalid") throw new Error("The shared library returned an invalid status.");
+    return {symbol:item.symbol,status:item.status,custom:item.custom===true};
+  });
+}
+
+function applySharedSymbolSnapshot(value){
+  const symbols=parseSharedSymbolSnapshot(value);
+  const nextInvalid=new Set();
+  const nextValid=new Set();
+  const nextCustom=new Set();
+  symbols.forEach(item=>{
+    if(item.status==="invalid") nextInvalid.add(item.symbol);
+    if(item.status==="valid") nextValid.add(item.symbol);
+    if(item.custom && !BASE_SYMBOLS.has(item.symbol)) nextCustom.add(item.symbol);
+  });
+  invalidSymbols=nextInvalid;
+  validSymbols=nextValid;
+  customSymbols=nextCustom;
+  persistSymbolStatuses();
+  renderSymbolLibrary();
+  render();
+  renderMyArtList();
+}
+
+async function readSymbolApiResponse(response){
+  let body=null;
+  try{body=await response.json();}catch(_){body=null;}
+  if(!response.ok) throw new Error(body?.error || "The shared symbol library is unavailable.");
+  return body;
+}
+
+async function refreshSharedSymbols(quiet=false){
+  if(!SYMBOL_API_URL) return;
+  try{
+    ensureLegacySymbolBackup();
+    const response=await fetch(SYMBOL_API_URL+"/api/symbols",{cache:"no-store"});
+    applySharedSymbolSnapshot(await readSymbolApiResponse(response));
+    if(!quiet && !$(`symbolModal`).hidden) $("symbolStatus").textContent="Shared library is up to date.";
+  }catch(error){
+    if(!quiet && !$(`symbolModal`).hidden) $("symbolStatus").textContent=(error instanceof Error ? error.message:"Shared updates are unavailable.")+" Using the last saved copy.";
+  }
+}
+
+function loadOwnerSession(){
+  try{ownerSessionToken=localStorage.getItem(OWNER_SESSION_STORAGE_KEY) || "";}
+  catch(_){ownerSessionToken="";}
+}
+
+function hasLegacySymbolsToImport(){
+  const backup=getLegacySymbolBackup();
+  return !!backup && (backup.invalid.length>0 || backup.valid.length>0 || backup.custom.length>0);
+}
+
+function updateOwnerUI(){
+  $("symbolOwnerState").textContent=ownerAuthenticated ? "Owner mode · editing enabled":"Shared library · read only";
+  $("symbolOwnerState").classList.toggle("active",ownerAuthenticated);
+  $("symbolOwnerOpen").hidden=ownerAuthenticated;
+  $("symbolOwnerSignOut").hidden=!ownerAuthenticated;
+  $("symbolOwnerLogin").hidden=ownerAuthenticated || !ownerLoginOpen;
+  $("symbolOwnerActions").hidden=!ownerAuthenticated;
+  $("symbolImportLegacy").hidden=!ownerAuthenticated || !hasLegacySymbolsToImport();
+  $("symbolIntro").textContent=ownerAuthenticated ?
+    "Owner mode is active on this device. Valid, Invalid, Confirm, and imported symbols update the shared library for everyone.":
+    "Tap a symbol to insert it. Shared Valid and Invalid marks are visible to everyone.";
+  renderSymbolLibrary();
+  renderMyArtList();
+}
+
+function forgetOwnerSession(message="Signed out on this device."){
+  ownerAuthenticated=false;
+  ownerSessionToken="";
+  ownerLoginOpen=false;
+  try{localStorage.removeItem(OWNER_SESSION_STORAGE_KEY);}catch(_){}
+  updateOwnerUI();
+  if(!$(`symbolModal`).hidden) $("symbolStatus").textContent=message;
+}
+
+async function validateOwnerSession(){
+  if(!ownerSessionToken || !SYMBOL_API_URL){
+    updateOwnerUI();
+    return;
+  }
+  try{
+    const response=await fetch(SYMBOL_API_URL+"/api/admin/session",{
+      headers:{Authorization:"Bearer "+ownerSessionToken},
+      cache:"no-store",
+    });
+    await readSymbolApiResponse(response);
+    ownerAuthenticated=true;
+    ownerLoginOpen=false;
+    updateOwnerUI();
+  }catch(_){
+    forgetOwnerSession("Owner session expired. Sign in again to edit the shared library.");
+  }
+}
+
+async function signInOwner(){
+  const ownerKey=$("symbolOwnerKey").value.trim();
+  if(!ownerKey){
+    $("symbolStatus").textContent="Enter your private owner key.";
+    return;
+  }
+  $("symbolOwnerUnlock").disabled=true;
+  $("symbolStatus").textContent="Checking owner key…";
+  try{
+    const response=await fetch(SYMBOL_API_URL+"/api/admin/login",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ownerKey}),
+    });
+    const body=await readSymbolApiResponse(response);
+    if(typeof body.token!=="string") throw new Error("The owner session could not be created.");
+    ownerSessionToken=body.token;
+    ownerAuthenticated=true;
+    ownerLoginOpen=false;
+    $("symbolOwnerKey").value="";
+    try{localStorage.setItem(OWNER_SESSION_STORAGE_KEY,ownerSessionToken);}catch(_){throw new Error("This browser blocked saving the owner session.");}
+    updateOwnerUI();
+    await refreshSharedSymbols(true);
+    $("symbolStatus").textContent="Owner mode unlocked on this device.";
+  }catch(error){
+    ownerAuthenticated=false;
+    updateOwnerUI();
+    $("symbolStatus").textContent=error instanceof Error ? error.message:"Owner sign-in failed.";
+  }finally{
+    $("symbolOwnerUnlock").disabled=false;
+  }
+}
+
+async function sendSymbolUpdates(updates){
+  if(!ownerAuthenticated || !ownerSessionToken) throw new Error("Owner sign-in is required to change the shared library.");
+  const response=await fetch(SYMBOL_API_URL+"/api/admin/symbols",{
+    method:"PUT",
+    headers:{
+      Authorization:"Bearer "+ownerSessionToken,
+      "Content-Type":"application/json",
+    },
+    body:JSON.stringify({updates}),
+  });
+  if(response.status===401){
+    forgetOwnerSession("Owner session expired. Sign in again to edit the shared library.");
+    throw new Error("Owner session expired.");
+  }
+  const body=await readSymbolApiResponse(response);
+  applySharedSymbolSnapshot(body);
+}
+
+async function importLegacySymbolStatuses(){
+  const backup=getLegacySymbolBackup();
+  if(!backup){
+    $("symbolStatus").textContent="There are no older marks to import on this device.";
+    return;
+  }
+  const custom=new Set(backup.custom);
+  const statusBySymbol=new Map();
+  backup.valid.forEach(symbol=>statusBySymbol.set(symbol,"valid"));
+  backup.invalid.forEach(symbol=>statusBySymbol.set(symbol,"invalid"));
+  custom.forEach(symbol=>{if(!statusBySymbol.has(symbol)) statusBySymbol.set(symbol,"unmarked");});
+  const updates=[...statusBySymbol].map(([symbol,status])=>({symbol,status,custom:custom.has(symbol)}));
+  if(!updates.length) return;
+  $("symbolImportLegacy").disabled=true;
+  $("symbolStatus").textContent="Importing this device’s old marks…";
+  try{
+    await sendSymbolUpdates(updates);
+    try{localStorage.setItem(LEGACY_SYMBOL_IMPORTED_KEY,String(Date.now()));}catch(_){}
+    updateOwnerUI();
+    $("symbolStatus").textContent="Imported "+updates.length+" old symbol mark"+(updates.length===1 ? ".":"s into the shared library.");
+  }catch(error){
+    $("symbolStatus").textContent=error instanceof Error ? error.message:"The old marks could not be imported.";
+  }finally{
+    $("symbolImportLegacy").disabled=false;
+  }
+}
+
 function getSymbolCollection(){
   if(!customSymbols.size) return {categories:SYMBOL_CATEGORIES,library:SYMBOL_LIBRARY};
   const customCategory={...CUSTOM_SYMBOL_CATEGORY,symbols:[...customSymbols]};
@@ -1559,21 +1808,23 @@ function renderSymbolLibrary(){
       insertButton.setAttribute("aria-label","Insert symbol "+item.symbol);
       insertButton.onclick=()=>insertLibrarySymbol(item.symbol);
 
-      const actions=createMyArtElement("div","symbol-card-actions");
+      const actions=createMyArtElement("div","symbol-card-actions"+(ownerAuthenticated ? " owner-editing":""));
       const copyButton=createMyArtElement("button","secondary","Copy");
       copyButton.type="button";
       copyButton.onclick=()=>copyLibrarySymbol(item.symbol);
-      const validButton=createMyArtElement("button","secondary symbol-valid-button"+(isValid ? " active":""),"Valid");
-      validButton.type="button";
-      validButton.setAttribute("aria-pressed",isValid ? "true":"false");
-      validButton.onclick=()=>toggleValidSymbol(item.symbol);
-      const invalidButton=createMyArtElement("button","secondary symbol-invalid-button"+(isInvalid ? " active":""),"Invalid");
-      invalidButton.type="button";
-      invalidButton.setAttribute("aria-pressed",isInvalid ? "true":"false");
-      invalidButton.onclick=()=>toggleInvalidSymbol(item.symbol);
       actions.appendChild(copyButton);
-      actions.appendChild(validButton);
-      actions.appendChild(invalidButton);
+      if(ownerAuthenticated){
+        const validButton=createMyArtElement("button","secondary symbol-valid-button"+(isValid ? " active":""),"Valid");
+        validButton.type="button";
+        validButton.setAttribute("aria-pressed",isValid ? "true":"false");
+        validButton.onclick=()=>toggleValidSymbol(item.symbol);
+        const invalidButton=createMyArtElement("button","secondary symbol-invalid-button"+(isInvalid ? " active":""),"Invalid");
+        invalidButton.type="button";
+        invalidButton.setAttribute("aria-pressed",isInvalid ? "true":"false");
+        invalidButton.onclick=()=>toggleInvalidSymbol(item.symbol);
+        actions.appendChild(validButton);
+        actions.appendChild(invalidButton);
+      }
       card.appendChild(insertButton);
       card.appendChild(actions);
       grid.appendChild(card);
@@ -1607,36 +1858,38 @@ async function copyLibrarySymbol(symbol){
   $("symbolStatus").textContent=copied ? "Copied "+symbol+".":"Clipboard access was blocked.";
 }
 
-function toggleValidSymbol(symbol){
+async function toggleValidSymbol(symbol){
   const wasValid=validSymbols.has(symbol);
-  if(wasValid){
-    validSymbols.delete(symbol);
-  }else{
-    validSymbols.add(symbol);
-    invalidSymbols.delete(symbol);
+  $("symbolStatus").textContent="Saving shared status…";
+  try{
+    await sendSymbolUpdates([{
+      symbol,
+      status:wasValid ? "unmarked":"valid",
+      custom:customSymbols.has(symbol),
+    }]);
+    $("symbolStatus").textContent=wasValid ?
+      symbol+" returned to unmarked.":
+      symbol+" marked valid for everyone. Its tile is now green.";
+  }catch(error){
+    $("symbolStatus").textContent=error instanceof Error ? error.message:"The shared status could not be saved.";
   }
-  persistSymbolStatuses();
-  renderSymbolLibrary();
-  render();
-  $("symbolStatus").textContent=wasValid ?
-    symbol+" returned to unmarked.":
-    symbol+" marked valid. Its tile is now green.";
 }
 
-function toggleInvalidSymbol(symbol){
+async function toggleInvalidSymbol(symbol){
   const wasInvalid=invalidSymbols.has(symbol);
-  if(wasInvalid){
-    invalidSymbols.delete(symbol);
-  }else{
-    invalidSymbols.add(symbol);
-    validSymbols.delete(symbol);
+  $("symbolStatus").textContent="Saving shared status…";
+  try{
+    await sendSymbolUpdates([{
+      symbol,
+      status:wasInvalid ? "unmarked":"invalid",
+      custom:customSymbols.has(symbol),
+    }]);
+    $("symbolStatus").textContent=wasInvalid ?
+      symbol+" returned to unmarked.":
+      symbol+" marked invalid for everyone. It will appear as □ in the preview.";
+  }catch(error){
+    $("symbolStatus").textContent=error instanceof Error ? error.message:"The shared status could not be saved.";
   }
-  persistSymbolStatuses();
-  renderSymbolLibrary();
-  render();
-  $("symbolStatus").textContent=wasInvalid ?
-    symbol+" returned to unmarked.":
-    symbol+" marked invalid. It will appear as □ in the preview.";
 }
 
 function openSymbolLibrary(){
@@ -1644,6 +1897,7 @@ function openSymbolLibrary(){
   $("symbolModal").hidden=false;
   document.body.classList.add("modal-open");
   $("symbolSearch").focus();
+  refreshSharedSymbols(true);
 }
 
 function closeSymbolLibrary(){
@@ -1666,30 +1920,28 @@ function getArtworkSymbols(template){
   ))];
 }
 
-function confirmSavedArtSymbols(template){
+async function confirmSavedArtSymbols(template){
   const symbols=getArtworkSymbols(template);
   if(!symbols.length){
     showMyArtStatus("“"+template.name+"” contains no library-style symbols to confirm.");
     return;
   }
 
-  const additions=[];
-  symbols.forEach(symbol=>{
-    validSymbols.add(symbol);
-    invalidSymbols.delete(symbol);
-    if(!BASE_SYMBOLS.has(symbol) && !customSymbols.has(symbol)){
-      customSymbols.add(symbol);
-      additions.push(symbol);
-    }
-  });
-  persistSymbolStatuses();
-  renderSymbolLibrary();
-  render();
-  renderMyArtList();
-  showMyArtStatus(
-    "Confirmed "+symbols.length+" symbol"+(symbols.length===1 ? "":"s")+" from “"+template.name+"” as valid."+
-    (additions.length ? " Added "+additions.length+" to My additions: "+additions.join(" "):"")
-  );
+  const additions=symbols.filter(symbol=>!BASE_SYMBOLS.has(symbol) && !customSymbols.has(symbol));
+  showMyArtStatus("Confirming symbols in the shared library…");
+  try{
+    await sendSymbolUpdates(symbols.map(symbol=>({
+      symbol,
+      status:"valid",
+      custom:customSymbols.has(symbol) || !BASE_SYMBOLS.has(symbol),
+    })));
+    showMyArtStatus(
+      "Confirmed "+symbols.length+" symbol"+(symbols.length===1 ? "":"s")+" from “"+template.name+"” as valid for everyone."+
+      (additions.length ? " Added "+additions.length+" to My additions: "+additions.join(" "):"")
+    );
+  }catch(error){
+    showMyArtStatus(error instanceof Error ? error.message:"The symbols could not be confirmed.",true);
+  }
 }
 
 function deleteSavedArt(id){
@@ -2051,6 +2303,25 @@ $("myArtModal").addEventListener("pointerdown",event=>{
 });
 $("symbolsOpen").onclick=openSymbolLibrary;
 $("symbolsClose").onclick=closeSymbolLibrary;
+$("symbolOwnerOpen").onclick=()=>{
+  ownerLoginOpen=true;
+  updateOwnerUI();
+  $("symbolOwnerKey").focus();
+};
+$("symbolOwnerCancel").onclick=()=>{
+  ownerLoginOpen=false;
+  $("symbolOwnerKey").value="";
+  updateOwnerUI();
+};
+$("symbolOwnerUnlock").onclick=signInOwner;
+$("symbolOwnerSignOut").onclick=()=>forgetOwnerSession();
+$("symbolImportLegacy").onclick=importLegacySymbolStatuses;
+$("symbolOwnerKey").addEventListener("keydown",event=>{
+  if(event.key==="Enter"){
+    event.preventDefault();
+    signInOwner();
+  }
+});
 $("symbolSearch").addEventListener("input",renderSymbolLibrary);
 $("symbolCategory").addEventListener("change",renderSymbolLibrary);
 $("symbolValidOnly").addEventListener("change",()=>{
@@ -2128,7 +2399,9 @@ if(donateToggle){
 }
 
 loadSymbolStatuses();
+loadOwnerSession();
 loadMyArtTemplates();
+updateOwnerUI();
 renderMyArtList();
 importArtFromLocation();
 updateEndpointUI("start");
@@ -2138,6 +2411,9 @@ updateSelectionStatus();
 updateModeUI();
 setComposerView("preview");
 render();
+refreshSharedSymbols(true);
+validateOwnerSession();
+if(window.addEventListener) window.addEventListener("focus",()=>refreshSharedSymbols(true));
 </script>
 </body>
 </html>
