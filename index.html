@@ -460,7 +460,7 @@
       <h2 id="myArtTitle">My Art</h2>
       <button id="myArtClose" type="button" class="secondary my-art-close">Close</button>
     </div>
-    <div class="tiny">Saved locally in this browser until you clear this site’s browser data. Tap a saved creation to edit it.</div>
+    <div id="myArtSyncNote" class="tiny">Saved locally in this browser. Sign in as owner in the Symbol Library to sync between devices.</div>
     <div id="myArtSaveRow" class="my-art-save">
       <input id="myArtName" maxlength="60" placeholder="Name this creation" aria-label="Creation name">
       <button id="myArtSaveCurrent" type="button">Save current</button>
@@ -546,7 +546,10 @@ EXPERIMENTAL_LEVELS.forEach(r=>{
 
 const RAINBOW = ["F0000","F0800","F0F00","08F00","00F00","00F0F","0000F","F111F"];
 const MAX_MESSAGE_LENGTH = 275;
+const MAX_MY_ART_ITEMS = 250;
+const MY_ART_SYNC_BATCH_SIZE = 200;
 const MY_ART_STORAGE_KEY = "forgeMasterMyArt.v1";
+const MY_ART_TOMBSTONES_STORAGE_KEY = "forgeMasterMyArtTombstones.v1";
 const INVALID_SYMBOL_STORAGE_KEY = "forgeMasterInvalidSymbols.v1";
 const VALID_SYMBOL_STORAGE_KEY = "forgeMasterValidSymbols.v1";
 const CUSTOM_SYMBOL_STORAGE_KEY = "forgeMasterCustomSymbols.v1";
@@ -636,9 +639,13 @@ let warnedOutput = "";
 let activeComposerView = "preview";
 let openPicker = null;
 let myArtTemplates = [];
+let myArtTombstones = [];
 let myArtStorageAvailable = true;
 let myArtTransferUrl = "";
 let editingArtId = null;
+let myArtLocalRevision = 0;
+let myArtSyncPromise = null;
+let myArtSyncRequested = false;
 let invalidSymbols = new Set(DEFAULT_INVALID_SYMBOLS);
 let validSymbols = new Set();
 let customSymbols = new Set();
@@ -1059,32 +1066,92 @@ function showMyArtStatus(message,isError=false){
   $("myArtStatus").classList.toggle("error",isError);
 }
 
+function updateMyArtSyncNote(){
+  $("myArtSyncNote").textContent=ownerAuthenticated ?
+    "Saved locally first, then privately synced between your signed-in devices. Tap a creation to edit it.":
+    "Saved locally in this browser. Sign in as owner in the Symbol Library to sync between devices.";
+}
+
 function updateMyArtCount(){
   $("myArtCount").textContent=String(myArtTemplates.length);
+}
+
+function normalizeMyArtTemplate(item){
+  if(!item || typeof item.id!=="string" || !/^[A-Za-z0-9._:-]{1,100}$/u.test(item.id) ||
+    typeof item.name!=="string" || typeof item.syntax!=="string" || !item.syntax ||
+    typeof item.text!=="string") return null;
+  const fallbackTime=Date.now();
+  const savedAt=Number.isInteger(item.savedAt) && item.savedAt>0 ? item.savedAt:fallbackTime;
+  const updatedAt=Number.isInteger(item.updatedAt) && item.updatedAt>=savedAt ? item.updatedAt:savedAt;
+  return {
+    id:item.id,
+    name:[...item.name].slice(0,60).join("") || "Untitled art",
+    text:item.text.slice(0,10000),
+    syntax:item.syntax.slice(0,10000),
+    manualSyntax:Boolean(item.manualSyntax),
+    editorState:item.editorState && typeof item.editorState==="object" && !Array.isArray(item.editorState) ? item.editorState:null,
+    savedAt,
+    updatedAt,
+  };
+}
+
+function normalizeMyArtTombstone(item){
+  if(!item || typeof item.id!=="string" || !/^[A-Za-z0-9._:-]{1,100}$/u.test(item.id) ||
+    !Number.isInteger(item.updatedAt) || item.updatedAt<1) return null;
+  return {id:item.id,updatedAt:item.updatedAt};
+}
+
+function reconcileMyArtState(templates,tombstones){
+  const templateById=new Map();
+  templates.map(normalizeMyArtTemplate).filter(Boolean).forEach(template=>{
+    const previous=templateById.get(template.id);
+    if(!previous || template.updatedAt>=previous.updatedAt) templateById.set(template.id,template);
+  });
+  const tombstoneById=new Map();
+  tombstones.map(normalizeMyArtTombstone).filter(Boolean).forEach(tombstone=>{
+    const previous=tombstoneById.get(tombstone.id);
+    if(!previous || tombstone.updatedAt>=previous.updatedAt) tombstoneById.set(tombstone.id,tombstone);
+  });
+  for(const [id,template] of templateById){
+    const tombstone=tombstoneById.get(id);
+    if(!tombstone) continue;
+    if(tombstone.updatedAt>=template.updatedAt) templateById.delete(id);
+    else tombstoneById.delete(id);
+  }
+  return {
+    templates:[...templateById.values()].sort((a,b)=>b.updatedAt-a.updatedAt || a.name.localeCompare(b.name)),
+    tombstones:[...tombstoneById.values()].sort((a,b)=>b.updatedAt-a.updatedAt),
+  };
 }
 
 function loadMyArtTemplates(){
   try{
     if(typeof localStorage==="undefined") throw new Error("Local storage is unavailable");
     const saved=JSON.parse(localStorage.getItem(MY_ART_STORAGE_KEY) || "[]");
-    myArtTemplates=Array.isArray(saved) ? saved.filter(item=>
-      item && typeof item.id==="string" && typeof item.name==="string" &&
-      typeof item.syntax==="string" && typeof item.text==="string"
-    ).slice(0,100):[];
+    const deleted=JSON.parse(localStorage.getItem(MY_ART_TOMBSTONES_STORAGE_KEY) || "[]");
+    const reconciled=reconcileMyArtState(Array.isArray(saved) ? saved:[],Array.isArray(deleted) ? deleted:[]);
+    myArtTemplates=reconciled.templates;
+    myArtTombstones=reconciled.tombstones;
     myArtStorageAvailable=true;
   }catch(_){
     myArtTemplates=[];
+    myArtTombstones=[];
     myArtStorageAvailable=false;
   }
+  myArtLocalRevision++;
   updateMyArtCount();
 }
 
-function persistMyArtTemplates(nextTemplates){
+function persistMyArtState(nextTemplates,nextTombstones=myArtTombstones){
   try{
     if(typeof localStorage==="undefined") throw new Error("Local storage is unavailable");
-    localStorage.setItem(MY_ART_STORAGE_KEY,JSON.stringify(nextTemplates));
-    myArtTemplates=nextTemplates;
+    const reconciled=reconcileMyArtState(nextTemplates,nextTombstones);
+    localStorage.setItem(MY_ART_STORAGE_KEY,JSON.stringify(reconciled.templates));
+    localStorage.setItem(MY_ART_TOMBSTONES_STORAGE_KEY,JSON.stringify(reconciled.tombstones));
+    myArtTemplates=reconciled.templates;
+    myArtTombstones=reconciled.tombstones;
     myArtStorageAvailable=true;
+    myArtLocalRevision++;
     updateMyArtCount();
     return true;
   }catch(_){
@@ -1092,6 +1159,10 @@ function persistMyArtTemplates(nextTemplates){
     showMyArtStatus("This browser blocked local saving. Check its site-data or privacy settings.",true);
     return false;
   }
+}
+
+function persistMyArtTemplates(nextTemplates){
+  return persistMyArtState(nextTemplates,myArtTombstones);
 }
 
 function getDefaultArtName(){
@@ -1336,17 +1407,25 @@ function importArtFromLocation(){
       !payload.s || payload.n.length>60 || payload.s.length>10000){
       throw new Error("Invalid transfer payload");
     }
+    if(myArtTemplates.length>=MAX_MY_ART_ITEMS){
+      throw new Error("My Art is full");
+    }
+    const importedAt=Date.now();
     const template={
-      id:`${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
+      id:`${importedAt}-${Math.random().toString(36).slice(2,9)}`,
       name:payload.n || "Imported art",
       text:syntaxToPlainText(payload.s),
       syntax:payload.s,
-      savedAt:Date.now(),
+      manualSyntax:true,
+      editorState:null,
+      savedAt:importedAt,
+      updatedAt:importedAt,
     };
-    if(!persistMyArtTemplates([template,...myArtTemplates].slice(0,100))) return;
+    if(!persistMyArtTemplates([template,...myArtTemplates])) return;
     renderMyArtList();
     openMyArt(false);
     showMyArtStatus(`Imported “${template.name}” from QR.`);
+    if(ownerAuthenticated) void syncMyArt(false);
   }catch(_){
     openMyArt(false);
     showMyArtStatus("That QR transfer link is invalid or damaged.",true);
@@ -1434,6 +1513,7 @@ function openMyArt(prepareToSave=false){
     $("myArtName").focus();
     $("myArtName").select();
   }
+  if(ownerAuthenticated) void syncMyArt(false);
 }
 
 function closeMyArt(){
@@ -1450,26 +1530,35 @@ function saveCurrentArt(){
     return;
   }
   const name=$("myArtName").value.trim() || getDefaultArtName();
+  const existingTemplate=myArtTemplates.find(item=>item.id===editingArtId);
+  if(!existingTemplate && myArtTemplates.length>=MAX_MY_ART_ITEMS){
+    showMyArtStatus(`My Art can hold up to ${MAX_MY_ART_ITEMS} creations. Delete one before saving another.`,true);
+    return;
+  }
+  const savedAt=Math.max(Date.now(),(existingTemplate?.updatedAt || 0)+1);
   const template={
-    id:editingArtId || `${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
+    id:editingArtId || `${savedAt}-${Math.random().toString(36).slice(2,9)}`,
     name,
     text:$("text").value,
     syntax,
     manualSyntax:manualSyntaxOverride!==null,
     editorState:getCurrentEditorState(),
-    savedAt:Date.now(),
+    savedAt,
+    updatedAt:savedAt,
   };
   const wasEditing=myArtTemplates.some(item=>item.id===editingArtId);
   const nextTemplates=wasEditing ?
     [template,...myArtTemplates.filter(item=>item.id!==editingArtId)]:
     [template,...myArtTemplates];
-  if(!persistMyArtTemplates(nextTemplates.slice(0,100))) return;
+  const nextTombstones=myArtTombstones.filter(item=>item.id!==template.id);
+  if(!persistMyArtState(nextTemplates,nextTombstones)) return;
   editingArtId=template.id;
   $("saveArtBtn").textContent="Update My Art";
   $("myArtSaveCurrent").textContent="Update";
   $("myArtName").value="";
   renderMyArtList();
   showMyArtStatus(`${wasEditing ? "Updated":"Saved"} “${name}”.`);
+  if(ownerAuthenticated) void syncMyArt(false);
 }
 
 async function copyTextValue(value){
@@ -1599,6 +1688,119 @@ async function readSymbolApiResponse(response){
   return body;
 }
 
+function applyMyArtSnapshot(snapshot){
+  if(!snapshot || snapshot.version!==1 || !Array.isArray(snapshot.artworks) || !Array.isArray(snapshot.tombstones)){
+    throw new Error("The synced My Art data is invalid.");
+  }
+  const templates=snapshot.artworks.map(normalizeMyArtTemplate);
+  const tombstones=snapshot.tombstones.map(normalizeMyArtTombstone);
+  if(templates.some(item=>!item) || tombstones.some(item=>!item)){
+    throw new Error("The synced My Art data is invalid.");
+  }
+  if(!persistMyArtState(templates,tombstones)) throw new Error("This browser could not save the synced artwork.");
+
+  if(editingArtId && !myArtTemplates.some(item=>item.id===editingArtId)){
+    editingArtId=null;
+    $("saveArtBtn").textContent="Save to My Art";
+    $("myArtSaveCurrent").textContent="Save current";
+  }
+  renderMyArtList();
+}
+
+function getMyArtSyncChanges(){
+  return [
+    ...myArtTemplates.map(item=>({type:"upsert",value:{
+      id:item.id,
+      name:item.name,
+      text:item.text,
+      syntax:item.syntax,
+      manualSyntax:Boolean(item.manualSyntax),
+      editorState:item.editorState || null,
+      savedAt:item.savedAt,
+      updatedAt:item.updatedAt,
+    }})),
+    ...myArtTombstones.map(item=>({type:"delete",value:{id:item.id,updatedAt:item.updatedAt}})),
+  ];
+}
+
+async function performMyArtSync(){
+  const startingRevision=myArtLocalRevision;
+  const changes=getMyArtSyncChanges();
+  let snapshot=null;
+
+  if(!changes.length){
+    const response=await fetch(SYMBOL_API_URL+"/api/admin/art",{
+      headers:{Authorization:"Bearer "+ownerSessionToken},
+      cache:"no-store",
+    });
+    if(response.status===401){
+      forgetOwnerSession("Owner session expired. Sign in again to sync My Art.");
+      throw new Error("Owner session expired.");
+    }
+    snapshot=await readSymbolApiResponse(response);
+  }else{
+    for(let offset=0;offset<changes.length;offset+=MY_ART_SYNC_BATCH_SIZE){
+      const chunk=changes.slice(offset,offset+MY_ART_SYNC_BATCH_SIZE);
+      const response=await fetch(SYMBOL_API_URL+"/api/admin/art",{
+        method:"PUT",
+        headers:{
+          Authorization:"Bearer "+ownerSessionToken,
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify({
+          upserts:chunk.filter(item=>item.type==="upsert").map(item=>item.value),
+          deletes:chunk.filter(item=>item.type==="delete").map(item=>item.value),
+        }),
+      });
+      if(response.status===401){
+        forgetOwnerSession("Owner session expired. Sign in again to sync My Art.");
+        throw new Error("Owner session expired.");
+      }
+      snapshot=await readSymbolApiResponse(response);
+    }
+  }
+
+  if(myArtLocalRevision!==startingRevision){
+    myArtSyncRequested=true;
+    return;
+  }
+  applyMyArtSnapshot(snapshot);
+}
+
+async function syncMyArt(quiet=true){
+  if(!ownerAuthenticated || !ownerSessionToken || !SYMBOL_API_URL) return false;
+  if(myArtSyncPromise){
+    myArtSyncRequested=true;
+    return myArtSyncPromise;
+  }
+  if(!quiet && !$("myArtModal").hidden) showMyArtStatus("Syncing My Art between your devices…");
+
+  myArtSyncPromise=(async()=>{
+    do{
+      myArtSyncRequested=false;
+      await performMyArtSync();
+    }while(myArtSyncRequested && ownerAuthenticated);
+    return true;
+  })();
+
+  try{
+    const synced=await myArtSyncPromise;
+    if(synced && !quiet && !$("myArtModal").hidden){
+      showMyArtStatus("My Art is synced between your signed-in devices.");
+    }
+    return synced;
+  }catch(error){
+    if(!quiet && !$("myArtModal").hidden){
+      showMyArtStatus((error instanceof Error ? error.message:"My Art sync is unavailable.")+" Your local copy is still safe.",true);
+    }
+    return false;
+  }finally{
+    const rerun=myArtSyncRequested && ownerAuthenticated;
+    myArtSyncPromise=null;
+    if(rerun) void syncMyArt(true);
+  }
+}
+
 async function refreshSharedSymbols(quiet=false){
   if(!SYMBOL_API_URL) return;
   try{
@@ -1632,6 +1834,7 @@ function updateOwnerUI(){
   $("symbolIntro").textContent=ownerAuthenticated ?
     "Owner mode is active on this device. Valid, Invalid, Confirm, and imported symbols update the shared library for everyone.":
     "Tap a symbol to insert it. Shared Valid and Invalid marks are visible to everyone.";
+  updateMyArtSyncNote();
   renderSymbolLibrary();
   renderMyArtList();
 }
@@ -1659,6 +1862,7 @@ async function validateOwnerSession(){
     ownerAuthenticated=true;
     ownerLoginOpen=false;
     updateOwnerUI();
+    await syncMyArt(true);
   }catch(_){
     forgetOwnerSession("Owner session expired. Sign in again to edit the shared library.");
   }
@@ -1687,7 +1891,10 @@ async function signInOwner(){
     try{localStorage.setItem(OWNER_SESSION_STORAGE_KEY,ownerSessionToken);}catch(_){throw new Error("This browser blocked saving the owner session.");}
     updateOwnerUI();
     await refreshSharedSymbols(true);
-    $("symbolStatus").textContent="Owner mode unlocked on this device.";
+    const artSynced=await syncMyArt(true);
+    $("symbolStatus").textContent=artSynced ?
+      "Owner mode unlocked. My Art is now synced on this device.":
+      "Owner mode unlocked. My Art will retry syncing when the connection is available.";
   }catch(error){
     ownerAuthenticated=false;
     updateOwnerUI();
@@ -1948,7 +2155,12 @@ function deleteSavedArt(id){
   const template=myArtTemplates.find(item=>item.id===id);
   if(!template || !window.confirm(`Delete “${template.name}” from My Art?`)) return;
   const next=myArtTemplates.filter(item=>item.id!==id);
-  if(!persistMyArtTemplates(next)) return;
+  const deletedAt=Math.max(Date.now(),template.updatedAt+1);
+  const nextTombstones=[
+    {id,updatedAt:deletedAt},
+    ...myArtTombstones.filter(item=>item.id!==id),
+  ];
+  if(!persistMyArtState(next,nextTombstones)) return;
   if(editingArtId===id){
     editingArtId=null;
     $("saveArtBtn").textContent="Save to My Art";
@@ -1956,6 +2168,7 @@ function deleteSavedArt(id){
   }
   renderMyArtList();
   showMyArtStatus(`Deleted “${template.name}”.`);
+  if(ownerAuthenticated) void syncMyArt(false);
 }
 
 function updateModeUI(){
@@ -2413,7 +2626,10 @@ setComposerView("preview");
 render();
 refreshSharedSymbols(true);
 validateOwnerSession();
-if(window.addEventListener) window.addEventListener("focus",()=>refreshSharedSymbols(true));
+if(window.addEventListener) window.addEventListener("focus",()=>{
+  refreshSharedSymbols(true);
+  if(ownerAuthenticated) void syncMyArt(true);
+});
 </script>
 </body>
 </html>
