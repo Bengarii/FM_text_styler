@@ -164,6 +164,13 @@
     font-variant-ligatures:none;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;
   }
   .editor-preview.generated-newlines{line-height:1.05}
+  .forge-heavy-preview{
+    /* Forge Master collapses heavy and double box-drawing glyphs into one
+       medium single-stroke family. Keep the Unicode source untouched and
+       reproduce that raster style only in the visual preview. */
+    -webkit-text-stroke:.35px currentColor;
+    paint-order:stroke fill;
+  }
   .syntax-input{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;background:var(--panel2)}
   .editor-toolbar{
     position:absolute;z-index:4;left:8px;right:8px;bottom:8px;
@@ -592,6 +599,12 @@ const LEGACY_SYMBOL_IMPORTED_KEY = "forgeMasterLegacySymbolImported.v1";
 const SYMBOL_API_URL = (document.querySelector?.('meta[name="forge-master-symbol-api"]')?.content || "").replace(/\/$/u,"");
 const DEFAULT_INVALID_SYMBOLS = ["◕","✧"];
 const CONFIRMED_UNSUPPORTED_SYMBOLS = new Set(["⠀"]);
+const FORGE_HEAVY_BOX_PREVIEW = new Map([
+  ["━","─"],["┃","│"],["┏","┌"],["┓","┐"],["┗","└"],["┛","┘"],
+  ["┣","├"],["┫","┤"],["┳","┬"],["┻","┴"],["╋","┼"],
+  ["═","─"],["║","│"],["╔","┌"],["╗","┐"],["╚","└"],["╝","┘"],
+  ["╠","├"],["╣","┤"],["╦","┬"],["╩","┴"],["╬","┼"],
+]);
 const SYMBOL_CATEGORIES = [
   {
     id:"lines",
@@ -1018,6 +1031,11 @@ function optimizeColorSyntax(syntax){
   return result;
 }
 
+function getForgePreviewGlyph(character){
+  const mapped=FORGE_HEAVY_BOX_PREVIEW.get(character);
+  return mapped ? {character:mapped,className:"forge-heavy-preview"} : {character,className:""};
+}
+
 function render(){
   const text = $("text").value;
   const mode = $("mode").value;
@@ -1057,9 +1075,11 @@ function render(){
       const addBreak = !manualBreak && ((newlineEach && ch !== " ") || (newlineSpaces && ch === " "));
       if(addBreak) out += "\\n";
       const invalidSymbol=invalidSymbols.has(ch);
-      const previewCharacter=invalidSymbol ? "□":escapeHtml(ch);
-      const invalidAttributes=invalidSymbol ? ' class="invalid-symbol-preview" title="Marked invalid: '+escapeHtml(ch)+'"':"";
-      preview += '<span'+invalidAttributes+' style="color:'+previewColor+'">'+previewCharacter+'</span>';
+      const forgeGlyph=invalidSymbol ? {character:"□",className:"invalid-symbol-preview"}:getForgePreviewGlyph(ch);
+      const previewCharacter=escapeHtml(forgeGlyph.character);
+      const classAttribute=forgeGlyph.className ? ' class="'+forgeGlyph.className+'"':"";
+      const titleAttribute=invalidSymbol ? ' title="Marked invalid: '+escapeHtml(ch)+'"':"";
+      preview += '<span'+classAttribute+titleAttribute+' style="color:'+previewColor+'">'+previewCharacter+'</span>';
       if(addBreak) preview += "<br>";
       if(ch==="\n"){
         atLineStart=true;
