@@ -6,6 +6,25 @@
 <meta name="forge-master-symbol-api" content="https://forge-master-symbols.personal-dd4.workers.dev" />
 <title>Forge Master Chat Formatter</title>
 <style>
+  @font-face{
+    font-family:"Forge Preview Latin";
+    src:url("fonts/forge-preview-latin.woff2") format("woff2");
+    font-style:normal;font-weight:750;font-display:swap;
+  }
+  @font-face{
+    font-family:"Forge Preview Box";
+    src:url("fonts/forge-preview-art.woff2") format("woff2");
+    font-style:normal;font-weight:750;font-display:swap;
+    size-adjust:136%;
+    unicode-range:U+2500-257F;
+  }
+  @font-face{
+    font-family:"Forge Preview Wide";
+    src:url("fonts/forge-preview-art.woff2") format("woff2");
+    font-style:normal;font-weight:750;font-display:swap;
+    size-adjust:146%;
+    unicode-range:U+25A1,U+2800,U+3000;
+  }
   :root{
     --bg:#111318; --panel:#1b1f28; --panel2:#232936; --text:#f5f7fb;
     --muted:#a9b1c3; --accent:#26a7ff; --border:#333b4b; --danger:#ff6b6b;
@@ -122,19 +141,27 @@
   .frequency-line>span{font-size:11px;color:var(--muted);white-space:nowrap}
   .frequency-line .segment-buttons{width:104px;flex:0 0 104px;padding:2px;gap:2px;border-radius:8px}
   .frequency-line .segment-button{padding:4px 5px;font-size:10px}
-  .editor-shell{position:relative;min-height:170px}
+  .editor-shell{--forge-line-width:min(308px,70.5vw,calc(100% - 24px));position:relative;min-height:170px}
   .editor-input{
     position:relative;z-index:2;display:block;min-height:170px;margin:0;
-    padding:12px 12px 48px;font-size:18px;line-height:1.45;white-space:pre-wrap;
+    padding:12px 12px 48px;font-size:18px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;
   }
   .editor-input.preview-editing{
+    padding-right:max(12px,calc(100% - var(--forge-line-width) - 14px));
     background:transparent;color:transparent;caret-color:#fff;
-    -webkit-text-fill-color:transparent;font-weight:800;
+    -webkit-text-fill-color:transparent;
+    font-family:"Forge Preview Wide","Forge Preview Box","Forge Preview Latin",system-ui,sans-serif;
+    font-size:17px;font-weight:750;line-height:1.15;letter-spacing:.1px;word-spacing:0;
+    font-variant-ligatures:none;
   }
   .editor-preview{
     position:absolute;z-index:1;inset:0;overflow:hidden;pointer-events:none;
-    padding:12px 12px 48px;border:1px solid var(--border);border-radius:10px;background:#4a5368;
-    font-size:18px;font-weight:800;line-height:1.45;white-space:pre-wrap;word-break:break-word;
+    padding:12px 12px 48px;
+    padding-right:max(12px,calc(100% - var(--forge-line-width) - 14px));
+    border:1px solid var(--border);border-radius:10px;background:#4a5368;
+    font-family:"Forge Preview Wide","Forge Preview Box","Forge Preview Latin",system-ui,sans-serif;
+    font-size:17px;font-weight:750;line-height:1.15;letter-spacing:.1px;word-spacing:0;
+    font-variant-ligatures:none;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;
   }
   .editor-preview.generated-newlines{line-height:1.05}
   .syntax-input{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;background:var(--panel2)}
@@ -564,6 +591,7 @@ const LEGACY_SYMBOL_BACKUP_KEY = "forgeMasterLegacySymbolBackup.v1";
 const LEGACY_SYMBOL_IMPORTED_KEY = "forgeMasterLegacySymbolImported.v1";
 const SYMBOL_API_URL = (document.querySelector?.('meta[name="forge-master-symbol-api"]')?.content || "").replace(/\/$/u,"");
 const DEFAULT_INVALID_SYMBOLS = ["◕","✧"];
+const CONFIRMED_UNSUPPORTED_SYMBOLS = new Set(["⠀"]);
 const SYMBOL_CATEGORIES = [
   {
     id:"lines",
@@ -947,7 +975,7 @@ function updateArtCompatibility(text){
   const messages=[];
 
   if(hasIndentation) messages.push("Line-leading spaces are protected automatically.");
-  if(isMultiline) messages.push("Exact alignment remains approximate because Forge Master uses variable-width characters.");
+  if(isMultiline) messages.push("Preview width and tested character sizes are calibrated to Forge Master; untested symbols may still vary.");
   if(unsupported.length){
     messages.push("Invalid in-game: "+unsupported.join(" ")+". "+(unsupported.length===1 ? "It is":"They are")+" marked as unsupported and may appear as □ or ?.");
   }
@@ -1029,7 +1057,7 @@ function render(){
       const addBreak = !manualBreak && ((newlineEach && ch !== " ") || (newlineSpaces && ch === " "));
       if(addBreak) out += "\\n";
       const invalidSymbol=invalidSymbols.has(ch);
-      const previewCharacter=invalidSymbol ? "□":(ch===" " ? "&nbsp;":escapeHtml(ch));
+      const previewCharacter=invalidSymbol ? "□":escapeHtml(ch);
       const invalidAttributes=invalidSymbol ? ' class="invalid-symbol-preview" title="Marked invalid: '+escapeHtml(ch)+'"':"";
       preview += '<span'+invalidAttributes+' style="color:'+previewColor+'">'+previewCharacter+'</span>';
       if(addBreak) preview += "<br>";
@@ -1731,9 +1759,10 @@ function loadSymbolStatuses(){
     invalidSymbols=new Set(parsedInvalid.filter(symbol=>typeof symbol==="string" && symbol.length<=4));
     validSymbols=new Set(parsedValid.filter(symbol=>typeof symbol==="string" && symbol.length<=4));
     customSymbols=new Set(parsedCustom.filter(symbol=>typeof symbol==="string" && symbol.length<=4 && !BASE_SYMBOLS.has(symbol)));
+    CONFIRMED_UNSUPPORTED_SYMBOLS.forEach(symbol=>invalidSymbols.add(symbol));
     invalidSymbols.forEach(symbol=>validSymbols.delete(symbol));
   }catch(_){
-    invalidSymbols=new Set(DEFAULT_INVALID_SYMBOLS);
+    invalidSymbols=new Set([...DEFAULT_INVALID_SYMBOLS,...CONFIRMED_UNSUPPORTED_SYMBOLS]);
     validSymbols=new Set();
     customSymbols=new Set();
   }
@@ -1808,6 +1837,10 @@ function applySharedSymbolSnapshot(value){
     if(item.status==="invalid") nextInvalid.add(item.symbol);
     if(item.status==="valid") nextValid.add(item.symbol);
     if(item.custom && !BASE_SYMBOLS.has(item.symbol)) nextCustom.add(item.symbol);
+  });
+  CONFIRMED_UNSUPPORTED_SYMBOLS.forEach(symbol=>{
+    nextInvalid.add(symbol);
+    nextValid.delete(symbol);
   });
   invalidSymbols=nextInvalid;
   validSymbols=nextValid;
