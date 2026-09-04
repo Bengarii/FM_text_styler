@@ -148,6 +148,9 @@
     background:rgba(24,29,39,.94);color:var(--text);font-size:9px;line-height:1.15;font-weight:800;
   }
   .editor-mini-button.active{background:var(--accent);color:#001522;border-color:transparent}
+  .editor-mini-button:disabled{opacity:.38;cursor:not-allowed}
+  .editor-history-button{min-width:24px;padding-inline:5px;font-size:13px;line-height:1}
+  .editor-history-divider{width:1px;height:18px;margin:0 2px;background:#4a5368}
   .inline-check{display:flex;gap:8px;align-items:center;padding:8px 9px;border:1px solid var(--border);border-radius:9px;background:var(--panel2)}
   .inline-check input{width:auto;transform:scale(1.15)}
   .inline-check label{margin:0;color:var(--text);font-size:12px}
@@ -306,6 +309,9 @@
           <button type="button" class="editor-mini-button" data-newline-toggle="spaces" aria-pressed="false" title="Newline after space">Space · ↵</button>
           <input type="checkbox" id="newlineEach" hidden>
           <input type="checkbox" id="newlineSpaces" hidden>
+          <span class="editor-history-divider" aria-hidden="true"></span>
+          <button id="undoEditor" type="button" class="editor-mini-button editor-history-button" aria-label="Undo editor change" title="Undo (Ctrl/Cmd+Z)" disabled>↶</button>
+          <button id="redoEditor" type="button" class="editor-mini-button editor-history-button" aria-label="Redo editor change" title="Redo (Ctrl/Cmd+Shift+Z or Ctrl+Y)" disabled>↷</button>
         </div>
         <div class="editor-control-group composer-tabs" role="tablist" aria-label="Message view">
           <button type="button" class="editor-mini-button composer-tab active" data-view="preview" role="tab" aria-selected="true" title="Preview">Preview</button>
@@ -653,6 +659,11 @@ let ownerSessionToken = "";
 let ownerAuthenticated = false;
 let ownerLoginOpen = false;
 let manualSyntaxOverride = null;
+const MAX_EDITOR_HISTORY = 120;
+let editorHistory = [];
+let editorHistoryIndex = -1;
+let editorHistoryReady = false;
+let restoringEditorHistory = false;
 const $ = id => document.getElementById(id);
 
 function hexDigit(c){ return parseInt(c,16); }
@@ -1039,10 +1050,11 @@ function render(){
   if(outputChanged) resetCopyWarning();
   $("preview").innerHTML = preview || "&nbsp;";
   updateArtCompatibility(text);
+  commitEditorHistory();
 }
 
 function setComposerView(view){
-  if(activeComposerView==="syntax" && view!=="syntax") applyDirectSyntaxEdit();
+  if(!restoringEditorHistory && activeComposerView==="syntax" && view!=="syntax") applyDirectSyntaxEdit();
   activeComposerView=view;
   const showSyntax=view==="syntax";
   $("text").hidden=showSyntax;
@@ -1055,6 +1067,130 @@ function setComposerView(view){
     tab.classList.toggle("active",active);
     tab.setAttribute("aria-selected",active ? "true":"false");
   });
+}
+
+function getEditorSnapshot(){
+  const textControl=$("text");
+  const syntaxControl=$("output");
+  return {
+    text:textControl.value,
+    selectionStart:Number.isInteger(textControl.selectionStart) ? textControl.selectionStart:textControl.value.length,
+    selectionEnd:Number.isInteger(textControl.selectionEnd) ? textControl.selectionEnd:textControl.value.length,
+    syntaxSelectionStart:Number.isInteger(syntaxControl.selectionStart) ? syntaxControl.selectionStart:syntaxControl.value.length,
+    syntaxSelectionEnd:Number.isInteger(syntaxControl.selectionEnd) ? syntaxControl.selectionEnd:syntaxControl.value.length,
+    mode:$("mode").value,
+    solidColor,
+    solidPattern:[...solidPattern],
+    solidSelections:solidSelections.map(selection=>({...selection})),
+    patternMode:$("patternMode").checked,
+    solidUnit:$("solidUnit").value,
+    rainbowMode:$("rainbowMode").checked,
+    startCode:$("startCode").value,
+    endCode:$("endCode").value,
+    stepSize:$("stepSize").value,
+    stepUnit:$("stepUnit").value,
+    newlineEach:$("newlineEach").checked,
+    newlineSpaces:$("newlineSpaces").checked,
+    manualSyntaxOverride,
+    editingArtId,
+  };
+}
+
+function getEditorSnapshotKey(snapshot){
+  const comparable={...snapshot};
+  delete comparable.selectionStart;
+  delete comparable.selectionEnd;
+  delete comparable.syntaxSelectionStart;
+  delete comparable.syntaxSelectionEnd;
+  return JSON.stringify(comparable);
+}
+
+function updateEditorHistoryButtons(){
+  $("undoEditor").disabled=!editorHistoryReady || editorHistoryIndex<=0;
+  $("redoEditor").disabled=!editorHistoryReady || editorHistoryIndex>=editorHistory.length-1;
+}
+
+function resetEditorHistory(){
+  const snapshot=getEditorSnapshot();
+  editorHistory=[{snapshot,key:getEditorSnapshotKey(snapshot)}];
+  editorHistoryIndex=0;
+  editorHistoryReady=true;
+  updateEditorHistoryButtons();
+}
+
+function commitEditorHistory(){
+  if(!editorHistoryReady || restoringEditorHistory) return;
+  const snapshot=getEditorSnapshot();
+  const key=getEditorSnapshotKey(snapshot);
+  if(editorHistory[editorHistoryIndex]?.key===key){
+    editorHistory[editorHistoryIndex].snapshot.selectionStart=snapshot.selectionStart;
+    editorHistory[editorHistoryIndex].snapshot.selectionEnd=snapshot.selectionEnd;
+    editorHistory[editorHistoryIndex].snapshot.syntaxSelectionStart=snapshot.syntaxSelectionStart;
+    editorHistory[editorHistoryIndex].snapshot.syntaxSelectionEnd=snapshot.syntaxSelectionEnd;
+    return;
+  }
+  editorHistory=editorHistory.slice(0,editorHistoryIndex+1);
+  editorHistory.push({snapshot,key});
+  if(editorHistory.length>MAX_EDITOR_HISTORY) editorHistory.shift();
+  editorHistoryIndex=editorHistory.length-1;
+  updateEditorHistoryButtons();
+}
+
+function restoreEditorHistorySnapshot(snapshot){
+  restoringEditorHistory=true;
+  try{
+    const textControl=$("text");
+    textControl.value=snapshot.text;
+    solidSelectionSource=snapshot.text;
+    solidColor=isValidColorCode(snapshot.solidColor) ? snapshot.solidColor:null;
+    solidPattern=Array.isArray(snapshot.solidPattern) ? snapshot.solidPattern.filter(isValidColorCode):[];
+    solidSelections=Array.isArray(snapshot.solidSelections) ? snapshot.solidSelections.map(selection=>({...selection})):[];
+    savedTextSelection=null;
+    $("mode").value=snapshot.mode==="gradient" ? "gradient":"solid";
+    $("patternMode").checked=Boolean(snapshot.patternMode);
+    $("solidUnit").value=snapshot.solidUnit==="characters" ? "characters":"words";
+    $("rainbowMode").checked=Boolean(snapshot.rainbowMode);
+    $("startCode").value=/^[0-9A-F]{5}$/i.test(snapshot.startCode || "") ? snapshot.startCode.toUpperCase():"F0000";
+    $("endCode").value=/^[0-9A-F]{5}$/i.test(snapshot.endCode || "") ? snapshot.endCode.toUpperCase():"11111";
+    $("stepSize").value=String(Math.max(1,Math.min(1000,parseInt(snapshot.stepSize,10) || 1)));
+    $("stepUnit").value=snapshot.stepUnit==="words" ? "words":"characters";
+    setNewlineControl("each",snapshot.newlineEach);
+    setNewlineControl("spaces",snapshot.newlineSpaces);
+    manualSyntaxOverride=typeof snapshot.manualSyntaxOverride==="string" ? snapshot.manualSyntaxOverride:null;
+    editingArtId=typeof snapshot.editingArtId==="string" ? snapshot.editingArtId:null;
+    $("saveArtBtn").textContent=editingArtId ? "Update My Art":"Save to My Art";
+    setButtonGroupValue("[data-solid-unit]","solidUnit",$("solidUnit").value);
+    setButtonGroupValue("[data-step-unit]","stepUnit",$("stepUnit").value);
+    updateEndpointUI("start");
+    updateEndpointUI("end");
+    renderSolidPattern();
+    updateSelectionStatus();
+    updateModeUI();
+    setComposerView(activeComposerView);
+    const selectionStart=Math.max(0,Math.min(textControl.value.length,snapshot.selectionStart));
+    const selectionEnd=Math.max(selectionStart,Math.min(textControl.value.length,snapshot.selectionEnd));
+    textControl.setSelectionRange(selectionStart,selectionEnd);
+    const syntaxControl=$("output");
+    const syntaxSelectionStart=Math.max(0,Math.min(syntaxControl.value.length,snapshot.syntaxSelectionStart));
+    const syntaxSelectionEnd=Math.max(syntaxSelectionStart,Math.min(syntaxControl.value.length,snapshot.syntaxSelectionEnd));
+    syntaxControl.setSelectionRange(syntaxSelectionStart,syntaxSelectionEnd);
+    resetCopyWarning();
+  }finally{
+    restoringEditorHistory=false;
+  }
+  updateEditorHistoryButtons();
+}
+
+function undoEditorChange(){
+  if(editorHistoryIndex<=0) return;
+  editorHistoryIndex--;
+  restoreEditorHistorySnapshot(editorHistory[editorHistoryIndex].snapshot);
+}
+
+function redoEditorChange(){
+  if(editorHistoryIndex>=editorHistory.length-1) return;
+  editorHistoryIndex++;
+  restoreEditorHistorySnapshot(editorHistory[editorHistoryIndex].snapshot);
 }
 
 function escapeHtml(s){
@@ -1352,6 +1488,7 @@ function restoreSavedArt(template){
   $("status").textContent=`Editing “${template.name}”. Save again to update it.`;
   $("text").focus();
   $("text").setSelectionRange(restoredText.length,restoredText.length);
+  commitEditorHistory();
 }
 
 function closeArtQr(){
@@ -2391,6 +2528,7 @@ syntaxControl.addEventListener("input",()=>{
   updateLengthUI(manualSyntaxOverride);
   resetCopyWarning();
   $("status").textContent="Direct syntax edits are active. Return to Preview to apply them visually.";
+  commitEditorHistory();
 });
 textControl.addEventListener("scroll",()=>{
   $("preview").scrollTop=textControl.scrollTop;
@@ -2490,10 +2628,24 @@ document.addEventListener("pointerdown",()=>{
 });
 
 document.addEventListener("keydown",event=>{
+  const commandKey=event.ctrlKey || event.metaKey;
+  const key=String(event.key || "").toLowerCase();
+  const shortcutTarget=event.target;
+  const shortcutInEditor=shortcutTarget===$("text") || shortcutTarget===$("output") ||
+    Boolean(shortcutTarget?.closest?.("#composerCard"));
+  if(shortcutInEditor && commandKey && !event.altKey && (key==="z" || key==="y")){
+    event.preventDefault();
+    if(key==="y" || event.shiftKey) redoEditorChange();
+    else undoEditorChange();
+    return;
+  }
   if(event.key==="Escape" && openPicker) closeColorPicker();
   if(event.key==="Escape" && !$("myArtModal").hidden) closeMyArt();
   if(event.key==="Escape" && !$("symbolModal").hidden) closeSymbolLibrary();
 });
+
+$("undoEditor").onclick=undoEditorChange;
+$("redoEditor").onclick=redoEditorChange;
 
 document.querySelectorAll(".composer-tab").forEach(tab=>{
   tab.onclick=()=>setComposerView(tab.dataset.view);
@@ -2624,6 +2776,7 @@ updateSelectionStatus();
 updateModeUI();
 setComposerView("preview");
 render();
+resetEditorHistory();
 refreshSharedSymbols(true);
 validateOwnerSession();
 if(window.addEventListener) window.addEventListener("focus",()=>{
